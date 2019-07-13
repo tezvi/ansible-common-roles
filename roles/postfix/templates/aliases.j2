@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+# See man 5 aliases for format
+mailer-daemon: postmaster
+postmaster: {{ app_user }}
+nobody: {{ app_user }}
+hostmaster: {{ app_user }}
+usenet: {{ app_user }}
+news: {{ app_user }}
+webmaster: {{ app_user }}
+www: {{ app_user }}
+ftp: {{ app_user }}
+abuse: {{ app_user }}

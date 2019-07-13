@@ -1,0 +1,66 @@
+---
+- name: Add amavis related users to proper groups
+  user:
+    name: "{{ item.user }}"
+    groups: "{{ item.group }}"
+    append: yes
+  with_items:
+    - user: clamav
+      group: amavis
+    - user: amavis
+      group: clamav
+
+- name: Configure Razor and Pyzor services
+  command: "{{ item }}"
+  become: true
+  become_user: amavis
+  with_items:
+    - razor-admin -create
+    - razor-admin -register
+    - pyzor discover
+
+- name: Enable amavis spam checking
+  lineinfile:
+    path: /etc/amavis/conf.d/15-content_filter_mode
+    insertbefore: '^#@bypass_spam_checks_maps'
+    line: |
+      @bypass_spam_checks_maps = (
+         \%bypass_spam_checks, \@bypass_spam_checks_acl, \$bypass_spam_checks_re);
+  notify: Restart Amavisd
+
+- name: Enable amavis antivirus checking
+  lineinfile:
+    path: /etc/amavis/conf.d/15-content_filter_mode
+    insertbefore: '^#@bypass_virus_checks_maps'
+    line: |
+      @bypass_virus_checks_maps = (
+         \%bypass_virus_checks, \@bypass_virus_checks_acl, \$bypass_virus_checks_re);
+  notify: Restart Amavisd
+
+- name: Add content_filter to postfix
+  command: postconf -e "content_filter = smtp-amavis:[127.0.0.1]:10024"
+  become: yes
+  notify: Restart Postfix
+
+- name: Enable amavis spam checking
+  blockinfile:
+    path: /etc/postfix/master.cf
+    block: "{{ lookup('file', './templates/master_amavis.cf.j2') }}"
+  notify: Restart Postfix
+
+- name: Add extra Postfix options
+  lineinfile:
+    dest: /etc/postfix/master.cf
+    firstmatch: yes
+    insertbefore: '^pickup'
+    line: |
+      -o content_filter=
+      -o receive_override_options=no_header_body_checks
+    state: present
+  notify: Restart Postfix
+
+- name: Lint spamassassin
+  command: spamassassin --lint
+
+- name: Recompile spamassassin modules
+  command: sa-compile

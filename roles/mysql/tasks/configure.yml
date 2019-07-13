@@ -1,0 +1,56 @@
+---
+- name: Set my.cnf file
+  template:
+    src: my.cnf.j2
+    dest: /etc/my.cnf
+    owner: "{{ mysql_user }}"
+    group: "{{ mysql_user }}"
+    mode: 0644
+  notify: Restart MySQL server
+
+- name: Add root user with host 127.0.0.1
+  mysql_user:
+    name: root
+    password: "{{ mysql_root_password }}"
+    priv: "*.*:ALL"
+    host: 127.0.0.1
+    state: present
+
+- name: Reset password for root user
+  command: "{{ item }}"
+  with_items:
+    - "mysqladmin -u root password {{ mysql_root_password }}"
+    - "touch /root/.ansible-root-passwd-reset"
+  args:
+    creates: "/root/.ansible-root-passwd-reset"
+
+# This enables password less login for root user
+- name: Set .my.cnf for root user
+  template:
+    src: .my.cnf.j2
+    dest: ~/.my.cnf
+    mode: 0600
+    owner: root
+    group: root
+
+- name: Remove anonymous users
+  mysql_user:
+    name: ""
+    host_all: yes
+    state: absent
+
+- name: Secures the MySQL root user remote access
+  mysql_user:
+    user: "root"
+    password: "{{ mysql_root_password }}"
+    host: "{{ item }}"
+  with_items:
+    - "::1"
+    - "127.0.0.1"
+    - "localhost"
+    - "{{ ansible_fqdn }}"
+
+- name: Remove the test database
+  mysql_db:
+    name: test
+    state: absent

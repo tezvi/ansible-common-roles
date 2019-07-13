@@ -1,0 +1,7 @@
+---
+- include: install.yml
+
+- include: configure.yml
+
+- include: lets_encrypt.yml
+  when: install_letsencrypt == true

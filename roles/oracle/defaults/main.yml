@@ -1,0 +1,16 @@
+---
+install_packages_dir: "{{ playbook_dir }}/files"
+
+# default install packages directory
+oracle_instantclient_package_dir: "{{ install_packages_dir }}/oracle-instantclient"
+
+# list of package files that has to be installed in specific order
+oracle_instantclient_packages:
+    - {filename: 'oracle-instantclient12.2-basic-12.2.0.1.0-1.x86_64.rpm'}
+    - {filename: 'oracle-instantclient12.2-devel-12.2.0.1.0-1.x86_64.rpm'}
+    - {filename: 'oracle-instantclient12.2-jdbc-12.2.0.1.0-1.x86_64.rpm'}
+    - {filename: 'oracle-instantclient12.2-sqlplus-12.2.0.1.0-1.x86_64.rpm'}
+
+oracle_instantclient_lib: "/usr/lib/oracle/12.2/client64/lib/"
+oracle_instantclient_home: "/usr/lib/oracle/12.2/client64"
+oracle_instantclient_include: "/usr/include/oracle/12.2/client64"

@@ -1,0 +1,10 @@
+---
+http_document_root: "/var/www/{{ http_domain_name }}"
+http_domain_name: "{{ web_domain | default('example.com') }}"
+letsencrypt_email: ssl@example.com
+install_letsencrypt: true
+http_vhost_aliases:
+  - "www.{{ http_domain_name }}"
+  - "{{ app_user }}"
+
+apache_distro_name: "{{ 'httpd' if is_rhel else 'apache2' }}"

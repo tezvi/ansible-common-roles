@@ -1,0 +1,60 @@
+# {{ ansible_managed }}
+[sshd]
+enabled = true
+
+[sshd-ddos]
+# This jail corresponds to the standard configuration in Fail2ban.
+# The mail-whois action send a notification e-mail with a whois request
+# in the body.
+port    = ssh
+logpath = %(sshd_log)s
+enabled = true
+
+[apache-auth]
+enabled = true
+
+[apache-badbots]
+enabled = true
+
+[apache-modsecurity]
+enabled = true
+
+[php-url-fopen]
+enabled = true
+
+[webmin-auth]
+enabled = false
+
+[proftpd]
+enabled = false
+
+[pure-ftpd]
+enabled = false
+
+[postfix]
+enabled = true
+
+[dovecot]
+enabled = true
+
+[mysqld-auth]
+{% if not is_rhel %}
+logpath = /var/log/mysql/*.log
+{% endif %}
+{% if mysql_status.stat.exists %}
+enabled = true
+{% else %}
+enabled = false
+{% endif %}
+
+[pam-generic]
+enabled = true
+
+[postfix-rbl]
+enabled = true
+
+[sendmail-auth]
+enabled = true
+
+[sendmail-reject]
+enabled = true

@@ -1,0 +1,58 @@
+---
+- name: "Provision remote server"
+  hosts:
+    - example.com
+  handlers:
+    - import_tasks: handlers/global.yml
+  connection: ssh
+  become: yes
+  become_user: root
+  become_method: sudo
+  gather_facts: yes
+  force_handlers: true
+  any_errors_fatal: true
+  vars:
+    app_user: appuser
+    admin_user: adminuser
+    admin_user_password: password
+    server_hostname: example.com
+
+  pre_tasks:
+    - name: Update APT cache
+      apt: update_cache=yes
+
+  roles:
+    - role: common
+      vars:
+        unattended_upgrades_email: root
+    - role: apache
+      vars:
+        http_document_root: "/var/www/{{ server_hostname }}"
+        http_domain_name: "{{ server_hostname }}"
+        letsencrypt_email: ssl@example.com
+        install_letsencrypt: true
+    - oracle
+    - php
+    - composer
+    - role: memcached
+      vars:
+        memcached_settings:
+          - name: m # Memory consumption
+            value: 200
+    - wkhtml
+    - redis
+    - rabbitmq
+    - supervisor
+    - postfix
+    - fail2ban
+    - role: mysql
+      vars:
+        mysql_root_password: password
+        mysql_databases:
+          - database: app_database
+            user: app_db_user
+            password: password
+            dump_file: app_database.sql # must be located in ./files/mysqldumps
+    - role: mediawiki-parsoid
+      vars:
+        parsoid_uri: "http://www.{{ http_domain_name }}/w/api.php"

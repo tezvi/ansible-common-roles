@@ -1,0 +1,28 @@
+---
+- name: Install Erlang
+  yum:
+    name: erlang
+
+- name: Import RabbitMQ key
+  rpm_key:
+    key: https://www.rabbitmq.com/rabbitmq-signing-key-public.asc
+
+- name: Download RMQ package
+  get_url:
+    url: https://github.com/rabbitmq/rabbitmq-server/releases/download/rabbitmq_v3_6_16/rabbitmq-server-3.6.16-1.el7.noarch.rpm
+    dest: /usr/src/rabbitmq-server-3.6.16-1.el7.noarch.rpm
+    validate_certs: false
+
+- name: Install RabbitMQ
+  yum:
+    name: /usr/src/rabbitmq-server-3.6.16-1.el7.noarch.rpm
+
+- name: Remove RabbitMQ installation RPM
+  file:
+    path: /usr/src/rabbitmq-server-3.6.16-1.el7.noarch.rpm
+    state: absent
+
+- name: Enable RabbitMQ service
+  service:
+    name: rabbitmq-server
+    state: started

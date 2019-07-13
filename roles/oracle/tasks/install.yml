@@ -1,0 +1,36 @@
+---
+- name: Install Oracle instant client packages
+  yum:
+    name: '{{item.stat.path}}'
+    state: present
+  with_items: "{{ check_instantclient_oracle_packages.results }}"
+  when: item.stat.exists and (ansible_check_mode is not defined or not ansible_check_mode)
+
+- name: Install libaio for Oracle instantclient
+  yum:
+    name: libaio
+    state: present
+
+- name: Create /etc/ld.so.conf.d/oracle.conf
+  copy:
+    content: "{{ oracle_instantclient_lib }}"
+    dest: /etc/ld.so.conf.d/oracle.conf
+  notify: Run ldconfig
+
+- name: Add {{ oracle_instantclient_home }}/bin to PATH
+  lineinfile:
+    line: "PATH=$PATH:{{ oracle_instantclient_home }}/bin"
+    dest: /etc/profile
+    state: present
+
+- name: Add Oracle to LD_LIBRARY_PATH in current environment
+  lineinfile:
+    line: "LD_LIBRARY_PATH={{ oracle_instantclient_lib }}"
+    state: present
+    dest: /etc/environment
+
+- name: Add ORACLE_HOME to current environment
+  lineinfile:
+    line: "ORACLE_HOME={{ oracle_instantclient_home }}"
+    state: present
+    dest: /etc/environment

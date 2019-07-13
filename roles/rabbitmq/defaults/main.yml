@@ -1,0 +1,12 @@
+---
+rabbitmq_plugins:
+  - rabbitmq_management
+
+rabbitmq_users:
+  - user: "admin"
+    password: "adminpasswd"
+    vhost: /
+    configure_priv: .*
+    read_priv: .*
+    write_priv: .*
+    tags: administrator

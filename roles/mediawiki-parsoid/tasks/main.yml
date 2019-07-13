@@ -1,0 +1,3 @@
+---
+- include: install_debian.yml
+  when: not is_rhel

@@ -1,0 +1,15 @@
+---
+- name: Check if Oracle instant client has been installed
+  stat:
+    path: "{{ ansible_env.ORACLE_HOME|default('') }}"
+  register: oracle_client_stat
+
+- name: Checking existing Oracle instant client install packages
+  local_action: stat path="{{ oracle_instantclient_package_dir }}/{{ item.filename }}"
+  with_items: "{{ oracle_instantclient_packages }}"
+  register: check_instantclient_oracle_packages
+
+- name: Reporting missing Oracle instantclient packages
+  local_action: "fail msg=\"Oracle InstantClient package could not be found: {{ item.item.filename }}\""
+  with_items: "{{ check_instantclient_oracle_packages.results }}"
+  when: not oracle_client_stat.stat.exists and not item.stat.exists

@@ -1,0 +1,35 @@
+---
+- name: Enable Unattended upgrades
+  lineinfile:
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    regexp: "\\s*\"\\$\\{distro_id\\}:\\$\\{distro_codename\\}-updates\";"
+    line: '"${distro_id}:${distro_codename}-updates";'
+    state: present
+
+- name: Enable automatic reboot when needed
+  lineinfile:
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    regexp: 'Unattended-Upgrade::Automatic-Reboot-Time '
+    line: "Unattended-Upgrade::Automatic-Reboot-Time \"03:00\";"
+    state: present
+
+- name: Configure Unattended upgrades
+  lineinfile:
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    regexp: "{{ item }}"
+    line: "{{ item }} \"true\";"
+    state: present
+  with_items:
+    - 'Unattended-Upgrade::MailOnlyOnError '
+    - 'Unattended-Upgrade::Mail '
+    - 'Unattended-Upgrade::Remove-Unused-Kernel-Packages '
+    - 'Unattended-Upgrade::Remove-Unused-Dependencies '
+    - 'Unattended-Upgrade::Automatic-Reboot '
+
+- name: Copy default period update config
+  template:
+    src: auto_upgrades.j2
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    mode: 0644
+    owner: root
+    group: root

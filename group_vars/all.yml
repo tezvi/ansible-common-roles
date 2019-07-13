@@ -1,0 +1,10 @@
+---
+# These variables should be globally defined.
+app_user: app
+admin_user: foobar
+app_uid: 1000
+server_hostname: example.com
+web_domain: "{{ server_hostname }}"
+
+# Do not edit bellow this line.
+is_rhel: "{{ true if ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux' else false }}"

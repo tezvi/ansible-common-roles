@@ -1,0 +1,7 @@
+---
+- include: install.yml
+
+- include: configure.yml
+
+- include: setup_databases.yml
+  when: mysql_databases is defined and (mysql_databases|length>0)

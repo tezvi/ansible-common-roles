@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  author: Andrej Vitez
+  description: Roles for configuring box with services for web development
+  version: 1.0
+  license: MIT
+  min_ansible_version: 2
+
+  platforms:
+    - name: Redhat
+    - name: Centos
+    - name: Debian
+    - name: Ubuntu
+
+  categories:
+    - php dev database mail
+
+dependencies: []

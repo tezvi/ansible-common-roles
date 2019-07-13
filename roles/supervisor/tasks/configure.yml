@@ -1,0 +1,21 @@
+---
+- name: Configure supervisor
+  template:
+    src: supervisord.conf.j2
+    dest: /etc/supervisord.conf
+    mode: 0644
+    owner: root
+    group: root
+  notify: Restart supervisord
+
+- name: Configure supervisor {{ supervisor_command_name }} script
+  template:
+    src: consumer.conf.j2
+    dest: /etc/supervisord.d/{{ supervisor_command_name }}.conf
+    mode: 0644
+    owner: root
+    group: root
+  when: supervisor_command_path != ''
+  notify:
+    - Reread supervisord
+    - Update supervisord

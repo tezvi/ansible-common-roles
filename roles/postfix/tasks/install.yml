@@ -1,0 +1,30 @@
+---
+- name: Configure global mailname
+  lineinfile:
+    path: /etc/mailname
+    line: "{{ postfix_mail_hostname }}"
+    create: true
+
+- name: Install Postfix
+  apt:
+    name: "{{ item }}"
+    state: latest
+  when: not is_rhel
+  with_items: "{{ postfix_install_packages }}"
+
+- name: Install Postfix
+  yum:
+    name: "{{ item }}"
+    state: latest
+  when: is_rhel
+  with_items: "{{ postfix_install_packages }}"
+
+- name: Start postfix and related daemons
+  service:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  with_items:
+    - postfix
+    - dovecot
+    - clamav-daemon

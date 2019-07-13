@@ -1,0 +1,9 @@
+---
+- include: is_installed.yml
+
+- include: install.yml
+  when: not oracle_client_stat.stat.exists and is_rhel
+
+- debug:
+    msg: Only RHEL distrubution are supported for Oracle installation
+  when: not oracle_client_stat.stat.exists and not is_rhel

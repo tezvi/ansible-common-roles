@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+# Prevent access to default document root
+<Directory /var/www/html>
+    deny from all
+</Directory>

@@ -1,0 +1,5 @@
+---
+- name: Restart UFW firewall service
+  service:
+    name: ufw
+    state: restarted

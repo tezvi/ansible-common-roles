@@ -1,0 +1,45 @@
+---
+- name: Create new databases
+  mysql_db:
+    name: "{{ item.database }}"
+    state: present
+  with_items: "{{ mysql_databases }}"
+  register: mysql_databases_stat
+
+- set_fact:
+    mysql_created_databases: "{{ mysql_created_databases | default([]) }} + [ '{{ item.db }}' ]"
+  with_items: "{{ mysql_databases_stat.results }}"
+  when: mysql_databases_stat is defined and item.changed
+
+- name: Create database users with all privileges
+  mysql_user:
+    name: "{{ item.user }}"
+    password: "{{ item.password }}"
+    priv: "{{ item.database }}.*:ALL,GRANT"
+    host: localhost
+    state: present
+  when: mysql_databases is defined and (mysql_databases|length>0)
+  with_items: "{{ mysql_databases }}"
+
+- name: Copy DB dump if available
+  copy:
+    src: files/mysqldumps/
+    dest: "{{ mysql_dump_dir }}"
+
+- name: Check existing dump files
+  stat:
+    path: "{{ mysql_dump_dir }}/{{ item.dump_file }}"
+  with_items: "{{ mysql_databases }}"
+  register: mysql_dumps_stat
+
+- name: Import DB dumps to databases
+  mysql_db:
+    state: import
+    login_user: "{{ item.user }}"
+    login_password: "{{ item.password }}"
+    name: "{{ item.database }}"
+    target: "{{ mysql_dump_dir }}/{{ item.dump_file }}"
+  when: mysql_created_databases is defined and item.database in mysql_created_databases
+        and mysql_dumps_stat is defined and (mysql_dumps_stat.results|length>0)
+  with_items: "{{ mysql_dumps_stat.results | selectattr('stat.exists') | map(attribute='item') | list }}"
+  notify: Remove temporary dump files

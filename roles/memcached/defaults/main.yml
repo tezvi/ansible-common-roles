@@ -1,0 +1,6 @@
+---
+memcached_settings:
+  - name: m # Memory consumption
+    value: 200
+  - name: c # Max connections
+    value: 1024

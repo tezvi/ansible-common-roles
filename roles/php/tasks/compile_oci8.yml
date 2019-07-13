@@ -1,0 +1,26 @@
+---
+- name: Compile the OCI8 extension
+  shell: pecl install oci8
+  environment:
+    C_INCLUDE_PATH: "{{ oracle_instantclient_include }}"
+
+- name: Set permissions for oci8 library
+  file:
+    name: "{{ extension_modules_dir }}/oci8.so"
+    mode: u=rwx,g=rx,o=rx
+
+- name: Enable and configure PHP oci8 extension
+  template:
+    src: oci8.ini.j2
+    dest: "{{ php_fpm_conf_dir }}/conf.d/20-oci.ini"
+    mode: 0644
+    owner: root
+    group: root
+  notify: Restart PHP-FPM
+
+- name: Validate compiled oci8 extension
+  shell: "{{ item }}"
+  check_mode: no
+  with_items:
+    - "ls {{ extension_modules_dir }}/oci8.so"
+    - php -m | grep -i oci8
