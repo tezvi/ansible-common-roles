@@ -1,0 +1,18 @@
+---
+unattended_upgrades_email: root
+unattended_upgrades_enable: true
+default_packages:
+  - vim
+  - git
+  - tree
+  - screen
+  - htop
+  - telnet
+  - unattended-upgrades
+user_sudo_group: "{{ 'admin' if is_rhel else 'sudo' }}"
+user_default_shell: /bin/bash
+app_user: appuser
+app_uid: 1000
+admin_user: adminuser
+admin_user_password:
+server_hostname: example.com

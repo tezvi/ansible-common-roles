@@ -1,0 +1,71 @@
+---
+php_web_domain: "{{ web_domain | default('example.com') }}"
+php_fpm_pool: www
+php_fpm_service: "{{ 'php-fpm' if is_rhel else 'php7.2-fpm' }}"
+php_fpm_conf_dir: "{{ '/etc/php.d' if is_rhel else '/etc/php/7.2/fpm' }}"
+php_dist: "{{ 'rhel' if is_rhel else 'ubuntu' }}"
+# PHP-FPM socket used by Apache and PHP-FPM.
+php_proc_run_dir: "/run/{{ 'php-fpm' if is_rhel else 'php' }}"
+php_fpm_socket_file: "{{ php_proc_run_dir }}/{{ php_web_domain }}.socket"
+php_fpm_pid_file: "{{ php_proc_run_dir }}/php-fpm.pid"
+
+php_fpm_memory_limit: 128M
+php_fpm_listen_allowed_clients: 127.0.0.1
+php_fpm_listen_owner: www-data
+php_fpm_listen_group: www-data
+php_fpm_listen_mode: "0660"
+php_fpm_pm_mode: dynamic
+php_fpm_pm_max_children: 50
+php_fpm_pm_start_servers: 5
+php_fpm_pm_min_spare_servers: 5
+php_fpm_pm_max_spare_servers: 35
+php_fpm_pm_max_requests: 500
+
+php_packages:
+  - php-fpm
+  - php-bcmath
+  - php-opcache
+  - php-cli
+  - php-common
+  - php-gd
+  - php-intl
+  - php-mbstring
+  - php-pdo
+  - php-soap
+  - php-xml
+  - php-json
+  - php-phar
+  - php-iconv
+  - php-pear
+  - php-mysqli
+
+php_packages_rhel:
+  - php72u-fpm-httpd
+  - pecl
+  - php72u-bcmath
+  - php72u-opcache
+  - php72u-cli
+  - php72u-common
+  - php72u-devel
+  - php72u-gd
+  - php72u-intl
+  - php72u-mbstring
+  - php72u-mcrypt
+  - php72u-pdo
+  - php72u-pecl-xdebug
+  - php72u-pecl-redis
+  - php72u-soap
+  - php72u-xml
+  - php72u-process
+  - php72u-mysqli
+
+extension_modules_dir: "{{ '/usr/lib64/php/modules' if is_rhel else '/usr/lib/php/20170718/' }}"
+oracle_instantclient_include: /usr/include/oracle/12.2/client64
+
+# Oracle related options.
+php_oci8_tns_admin: /usr/lib/oracle/12.2/client64/network/admin
+php_oci8_nls_lang: AMERICAN_AMERICA.WE8MSWIN1252
+php_oci8_nls_sort: AMERICAN
+php_oci8_nls_date_format: yyyy-mm-dd hh24:mi:ss
+php_oci8_lang: en_US
+php_oci8_nls_numeric_characters: .,

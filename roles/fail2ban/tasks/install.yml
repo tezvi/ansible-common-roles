@@ -1,0 +1,18 @@
+---
+- name: Install Fail2Ban
+  yum:
+    name: fail2ban
+    state: latest
+  when: is_rhel
+
+- name: Install Fail2Ban
+  apt:
+    name: fail2ban
+    state: latest
+  when: not is_rhel
+
+- name: Start Fail2Ban daemon
+  service:
+    name: fail2ban
+    state: started
+    enabled: true

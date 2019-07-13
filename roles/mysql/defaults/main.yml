@@ -1,0 +1,13 @@
+---
+mysql_user: mysql
+mysql_root_password: password
+mysql_port: 3306
+mysql_dump_dir: /tmp/mysqldumps
+
+# Example
+# mysql_databases:
+#   - database: dbname
+#     user: user
+#     password: password
+#     dump_file: filepath
+mysql_databases: []

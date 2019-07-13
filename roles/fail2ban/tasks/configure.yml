@@ -1,0 +1,26 @@
+---
+- name: Check if MySQL Exists
+  stat: path=/usr/bin/mysql
+  register: mysql_status
+
+- name: Add extra fail2ban filters
+  template:
+    src: "filter_{{ item }}.conf.j2"
+    dest: "/etc/fail2ban/filter.d/{{ item }}.conf"
+    mode: 0644
+    owner: root
+    group: root
+  notify: Restart Fail2Ban
+  with_items:
+    - sshd_ddos
+    - postfix-rbl
+
+- name: Configure default Jail
+  template:
+    src: default_jail.conf.j2
+    dest: /etc/fail2ban/jail.d/default-jail.conf
+    force: true
+    mode: 0644
+    owner: root
+    group: root
+  notify: Restart Fail2Ban

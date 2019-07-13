@@ -1,0 +1,24 @@
+---
+- name: Install MySQL server
+  apt:
+    name: mysql-server
+    state: present
+  when: not is_rhel
+
+- name: Install MySQL server
+  yum:
+    name: mysql-server
+    state: present
+  when: is_rhel
+
+- name: Install the Python MySQLB module
+  apt:
+    name: python3-mysqldb
+    state: present
+
+- name: Enable MySQL service
+  service:
+    name: mysql
+    state: started
+    enabled: yes
+

@@ -1,0 +1,45 @@
+---
+- name: Enable PHP opcache
+  lineinfile:
+    dest: "{{ php_fpm_conf_dir }}/conf.d/10-opcache.ini"
+    regexp: '^;?opcache.enable=[1|0]'
+    line: 'opcache.enable=1'
+    state: present
+
+- name: Raise opcache max_accelerated_files value
+  lineinfile:
+    dest: "{{ php_fpm_conf_dir }}/conf.d/10-opcache.ini"
+    regexp: '^opcache.max_accelerated_files=\d+'
+    line: 'opcache.max_accelerated_files=30000'
+    state: present
+
+- name: Configure PHP-FPM globally
+  template:
+    src: "php-fpm.conf.{{ php_dist }}.j2"
+    dest: "{{ php_fpm_conf_dir }}/php-fpm.conf"
+    mode: 0644
+    owner: root
+    group: root
+  notify: Restart PHP-FPM
+
+- name: "Configure PHP-FPM {{ php_fpm_pool }} node"
+  template:
+    src: "www.conf.{{ php_dist }}.j2"
+    dest: "{{ php_fpm_conf_dir }}/pool.d/{{ php_fpm_pool }}.conf"
+    mode: 0644
+    owner: root
+    group: root
+  notify: Restart PHP-FPM
+
+- name: Remove php engine info from server signature
+  lineinfile:
+    dest: "{{ php_fpm_conf_dir }}/php.ini"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.replace }}"
+    state: present
+  with_items:
+    - regexp: "^upload_max_filesize = 2M"
+      replace: "upload_max_filesize = 20M"
+    - regexp: "^engine = On"
+      replace: "engine = Off"
+  notify: Restart PHP-FPM

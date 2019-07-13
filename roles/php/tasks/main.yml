@@ -1,0 +1,7 @@
+---
+- include: install.yml
+
+- include: install_oci8.yml
+
+- include: configure.yml
+

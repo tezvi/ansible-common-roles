@@ -1,0 +1,45 @@
+---
+- name: Update memcached configuration
+  lineinfile:
+    dest: /etc/memcached.conf
+    regexp: "^[#\\s]*-{{ item.name }}"
+    line: "-{{ item.name }} {{item.value}}"
+    state: present
+  with_items: "{{ memcached_settings }}"
+  notify: Restart memcached
+
+- name: Check if PHP is installed
+  stat:
+    path: /usr/bin/php
+  register: php_status
+
+- name: Install PHP memcached module
+  apt:
+    name: php-memcached
+    state: latest
+  when: not is_rhel and php_status.stat.exists
+  register: stat_memcached_install
+
+- name: Install PHP memcached module
+  yum:
+    name: php71u-memcached
+    state: latest
+  when: is_rhel and php_status.stat.exists
+  register: stat_memcached_install
+
+- shell:
+    cmd: 'php -m | grep memcached'
+  when: stat_memcached_install.changed
+  ignore_errors: yes
+  register: php_memcached_status
+
+- name: Validate that PHP memcached module is enabled
+  fail:
+    msg: PHP memcached module is not installed
+  when: php_memcached_status is not defined
+
+- name: Restart FPM if installed
+  service:
+    name: "{{ 'php-fpm' if is_rhel else 'php7.2-fpm' }}"
+    state: restarted
+  when: php_status.stat.exists

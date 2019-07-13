@@ -1,0 +1,75 @@
+---
+- name: Update Postfix configuration
+  lineinfile:
+    dest: "{{ postfix_config_file }}"
+    line: "{{ item.name }} = {{ item.value }}"
+    regexp: "^{{ item.name }} ="
+  with_items:
+    - name: inet_interfaces
+      value: "{{ postfix_inet_interfaces }}"
+    - name: inet_protocols
+      value: "{{ postfix_inet_protocols }}"
+  notify: Restart Postfix
+
+- name: Configure Postfix mailbox directory
+  shell: "postconf -e 'home_mailbox={{ postfix_maildir_name }}/'"
+
+- name: Configure Postfix mailbox directory
+  shell: postconf -e 'virtual_alias_maps=hash:/etc/postfix/virtual'
+
+- name: Configure PHP-FPM globally
+  template:
+    src: "users_virtual_table.j2"
+    dest: /etc/postfix/virtual
+    mode: 0644
+    owner: root
+    group: root
+
+- name: Apply users virtual email configuration
+  shell: postmap /etc/postfix/virtual
+  notify: Restart Postfix
+
+- name: Configure new aliases
+  template:
+    src: "aliases.j2"
+    dest: /etc/aliases
+    mode: 0644
+    owner: root
+    group: root
+  notify: Reload newaliases
+
+- name: Whitelist Postfix with UFW
+  ufw:
+    rule: limit
+    name: Postfix
+    default: deny
+    state: enabled
+  notify: Restart UFW firewall service
+
+- name: Export env MAIL variable
+  lineinfile:
+    dest: "{{ item }}"
+    regexp: '^export MAIL='
+    line: "export MAIL=~/{{ postfix_maildir_name }}"
+    state: present
+    create: true
+  with_items:
+    - /etc/bash.bashrc
+    - /etc/profile.d/mail.sh
+
+- name: Update s-nail configuration
+  lineinfile:
+    dest: /etc/s-nail.rc
+    line: "set {{ item }}"
+    regexp: "^set {{ item}}"
+  with_items:
+    - emptystart
+    - folder=Maildir
+    - record=+sent
+
+- name: Configure default Dovecot mailbox
+  lineinfile:
+    dest: /etc/dovecot/conf.d/10-mail.conf
+    regexp: '^mail_location = mbox:'
+    line: "mail_location = maildir:~/{{ postfix_maildir_name }}"
+    state: present

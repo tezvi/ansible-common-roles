@@ -1,0 +1,69 @@
+---
+- name: Ensure user group exists
+  group:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - "{{ app_user }}"
+    - "{{ admin_user }}"
+    - "{{ user_sudo_group }}"
+
+- name: "Create user '{{ app_user }}' with a specific uid, primary group and ssh key"
+  user:
+    name: "{{ app_user }}"
+    comment: "{{ app_user }}"
+    uid: "{{ app_uid }}"
+    group: "{{ app_user }}"
+    shell: "{{ user_default_shell }}"
+    create_home: true
+    generate_ssh_key: yes
+    ssh_key_bits: 2048
+    ssh_key_file: .ssh/id_rsa
+
+- name: "Create local admin user '{{ admin_user }}' with a specific uid, primary group and local ssh key"
+  user:
+    name: "{{ admin_user }}"
+    comment: "{{ admin_user }}"
+    groups: "{{ user_sudo_group }},{{ admin_user }}"
+    append: yes
+    shell: "{{ user_default_shell }}"
+    password: "{{ admin_user_password | password_hash('sha512') }}"
+    create_home: true
+
+- name: Copy user's bash profile
+  template:
+    src: .bash_profile.j2
+    dest: "/home/{{ item }}/.bash_profile"
+    mode: 0644
+    owner: "{{ item }}"
+    group: "{{ item }}"
+  with_items:
+    - "{{ app_user }}"
+    - "{{ admin_user }}"
+
+- name: Copy user's bashrc
+  template:
+    src: appuser.bashrc.j2
+    dest: "/home/{{ app_user }}/.bashrc"
+    mode: 0644
+    owner: "{{ item }}"
+    group: "{{ item }}"
+  with_items:
+    - "{{ app_user }}"
+    - "{{ admin_user }}"
+
+- name: Checking for existing local user SSH keys
+  local_action: stat path="{{ playbook_dir }}/files/{{ item }}.key.pub"
+  with_items:
+    - "{{ app_user }}"
+    - "{{ admin_user }}"
+  register: check_user_keys
+  become: false
+
+- name: Add authorized key to user profile
+  authorized_key:
+    user: "{{ item.item }}"
+    key: "{{ lookup('file', 'files/'+ item.item + '.key.pub') }}"
+  with_items: "{{ check_user_keys.results }}"
+  when: item.stat.exists
+

@@ -1,0 +1,41 @@
+---
+postfix_config_file: /etc/postfix/main.cf
+postfix_inet_interfaces: localhost
+postfix_inet_protocols: all
+postfix_maildir_name: Maildir
+postfix_mail_hostname: "{{ web_domain | default('example.com') }}"
+# Map users in virtual map
+# Example:
+# postfix_virtual_user_map:
+#  - emails:
+#     - admin@localhost
+#    user: "{{ app_user }}"
+postfix_virtual_user_map:
+  - emails:
+      - admin@localhost
+    user: "{{ app_user }}"
+
+postfix_install_packages:
+  - postfix
+  - dovecot-core
+  - dovecot-imapd
+  - s-nail
+  - clamav-daemon
+  - amavisd-new
+  - libnet-dns-perl
+  - libmail-spf-perl
+  - pyzor
+  - razor
+  # Extra packages to support archive scanning
+  - bzip2
+  - cabextract
+  - cpio
+  - file
+  - gzip
+  - nomarch
+  - pax
+  - rar
+  - unrar
+  - unzip
+  - zip
+  - sa-compile

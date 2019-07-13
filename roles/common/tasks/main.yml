@@ -1,0 +1,13 @@
+---
+- name: Setup locale
+  lineinfile:
+    dest: /etc/environment
+    line: 'LC_ALL=en_US.UTF-8'
+    state: present
+
+- include: install_packages.yml
+- include: configure_environment.yml
+- include: configure_user.yml
+
+- include: configure_autoupdates.yml
+  when: unattended_upgrades_enable

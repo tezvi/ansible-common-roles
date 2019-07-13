@@ -1,0 +1,46 @@
+---
+- name: Install letsencrypt client
+  apt:
+    name: python-certbot-apache
+    state: latest
+
+- name: Create related directories
+  file:
+    name: "{{ item }}"
+    state: directory
+  with_items:
+    - /etc/apache2/cert
+
+- name: Create letsencrypt certificate
+  shell: >
+    letsencrypt certonly -n --apache -w {{ http_document_root }} -m {{ letsencrypt_email }} \
+      --agree-tos -d {{ http_domain_name }}
+  args:
+    creates: /etc/letsencrypt/live/{{ http_domain_name }}
+
+- name: Generate dhparams
+  shell: openssl dhparam -out /etc/apahe2/cert/dhparams.pem 2048
+  args:
+    creates: /etc/apache2/cert/dhparams.pem
+
+- name: Create LetsEncrypt Apache configuration
+  template:
+    src: letsencrypt_alias.conf.j2
+    dest: "/etc/apache2/conf-available/letsencrypt_alias.conf"
+    mode: 0644
+    owner: root
+    group: root
+
+- name: Enables LetsEncrypt Apache2 configuration
+  command: a2enconf letsencrypt_alias
+  args:
+    creates: "/etc/apache2/conf-enabled/letsencrypt_alias.conf"
+  notify: Restart Apache
+
+- name: Add letsencrypt cronjob for certificate renewal
+  cron:
+    name: letsencrypt_renewal
+    special_time: weekly
+    job: >
+      letsencrypt --renew certonly -n --apache -w {{ http_document_root }} -m {{ letsencrypt_email }} \
+        --agree-tos -d {{ http_domain_name }} && systemctl reload apache2

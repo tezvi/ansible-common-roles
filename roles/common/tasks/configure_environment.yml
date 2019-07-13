@@ -1,0 +1,54 @@
+---
+- name: Install bash auto-completions
+  apt:
+    name: bash-completion
+    state: present
+
+- name: Copy root user's bashrc
+  template:
+    src: root.bashrc.j2
+    dest: /root/.bashrc
+    mode: 0644
+    owner: root
+    group: root
+
+- name: Prevent direct root user SSH login
+  lineinfile:
+    dest: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: 'PermitRootLogin no'
+    state: present
+  notify: Restart SSHD service
+
+- name: Enable UFW and allow SSH only
+  ufw:
+    rule: limit
+    port: ssh
+    proto: tcp
+    default: deny
+    state: enabled
+  notify: Restart UFW firewall service
+
+- name: Configure hostname
+  hostname:
+    name: "{{ server_hostname }}"
+  when: server_hostname != ""
+
+- name: Configure default CRON email
+  lineinfile:
+    dest: /etc/crontab
+    insertbefore: '^SHELL='
+    line: 'MAILTO=root'
+    state: present
+
+- name: Configure inputrc
+  lineinfile:
+    dest: /etc/inputrc
+    insertbefore: "^#.+?: {{ item.cmd }}"
+    line: "{{ item.code }}: {{ item.cmd }}"
+    state: present
+  with_items:
+    - cmd: history-search-backward
+      code: '"\e[5~"'
+    - cmd: history-search-forward
+      code: '"\e[6~"'

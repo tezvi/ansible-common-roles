@@ -1,0 +1,24 @@
+---
+- name: Install composer
+  shell: curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin
+  args:
+    creates: "{{ composer_path }}"
+
+- name: Rename composer.phar
+  shell: "mv {{ composer_path }}.phar {{ composer_path }}"
+  args:
+    creates: "{{ composer_path }}"
+
+- name: Make composer executable
+  file:
+    path: "{{ composer_path }}"
+    mode: a+x
+    state: file
+
+- name: Symlink composer for root
+  file:
+    src: "{{ composer_path }}"
+    dest: /usr/bin/composer
+    owner: root
+    group: root
+    state: link

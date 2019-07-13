@@ -1,0 +1,27 @@
+---
+- name: Install Redis
+  apt:
+    name: redis
+    state: latest
+  when: not is_rhel
+
+- name: Install Redis
+  yum:
+    name: redis
+    state: latest
+  when: is_rhel
+
+- name: Start Redis daemon
+  service:
+    name: redis
+    state: started
+    enabled: true
+
+- name: Configure Redis
+  template:
+    src: redis.conf.j2
+    dest: /etc/redis.conf
+    mode: 0644
+    owner: root
+    group: root
+  notify: Restart Redis

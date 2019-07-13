@@ -1,0 +1,12 @@
+---
+- name: Install PHP7 and extensions
+  apt:
+    name: "{{ item }}"
+    state: latest
+  with_items: "{{ php_packages_rhel if is_rhel else php_packages }}"
+
+- name: Start PHP-FPM
+  service:
+    name: "{{ php_fpm_service }}"
+    state: started
+    enabled: true

@@ -1,0 +1,13 @@
+---
+- name: Restart Postfix
+  service:
+    name: postfix
+    state: restarted
+
+- name: Restart Amavisd
+  service:
+    name: amavis
+    state: restarted
+
+- name: Reload newaliases
+  shell: newaliases

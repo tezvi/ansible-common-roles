@@ -1,0 +1,30 @@
+---
+- name: Add an apt key for parsoid repo
+  apt_key:
+    keyserver: keys.gnupg.net
+    id: AF380A3036A03444
+
+- name: Add Parsoid APT repository
+  apt_repository:
+    repo: "deb https://releases.wikimedia.org/debian jessie-mediawiki main"
+    state: present
+  register: parsoid_apt_repo
+
+- name: Update APT cache
+  apt:
+    update_cache: yes
+  when: parsoid_apt_repo.changed
+
+- name: Install Parsoid
+  apt:
+    name: parsoid
+    state: latest
+
+- name: Configure Parsoid
+  template:
+    src: parsoid_config.yaml.j2
+    dest: /etc/mediawiki/parsoid/config.yaml
+    mode: 0644
+    owner: root
+    group: root
+  notify: Restart Parsoid

@@ -1,0 +1,16 @@
+---
+- shell: grep '^ORACLE_HOME=' /etc/environment
+  check_mode: no
+  register: oracle_env_stat
+  ignore_errors: yes
+
+- set_fact:
+    oracle_is_installed: "{{ oracle_env_stat is defined and oracle_env_stat.rc == 0 | bool }}"
+
+- name: Check if OCI8 extension for PHP has been installed
+  stat:
+    path: "{{ extension_modules_dir }}/oci8.so"
+  register: php_oci8_stat
+
+- include: compile_oci8.yml
+  when: oracle_is_installed and not php_oci8_stat.stat.exists

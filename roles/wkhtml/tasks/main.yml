@@ -1,0 +1,19 @@
+---
+- name: Install wkhtmltopdf
+  yum:
+    with_items:
+      - wkhtmltopdf
+      - xorg-x11-fonts-Type1.noarch
+      - dejavu-sans-fonts
+    state: latest
+    enablerepo: epel-testing
+  when: is_rhel
+
+- name: Install wkhtmltopdf
+  apt:
+    pkg:
+      - wkhtmltopdf
+      - xvfb
+      - libfontconfig
+    state: latest
+  when: not is_rhel

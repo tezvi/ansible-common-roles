@@ -1,0 +1,11 @@
+---
+- name: Install Supervisord
+  yum:
+      pkg: supervisor
+      state: latest
+
+- name: Enable supervisor service
+  service:
+    name: supervisord
+    state: started
+    enabled: yes

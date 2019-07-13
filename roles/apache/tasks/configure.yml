@@ -1,0 +1,84 @@
+---
+- name: Configure mpm event module
+  template:
+    src: module-mpm.conf.j2
+    dest: /etc/apache2/mods-available/mpm_event.conf
+    mode: 0644
+    owner: root
+    group: root
+  notify: Restart Apache
+
+- name: Enables the Apache2 module "{{ item }}"
+  apache2_module:
+    state: present
+    name: "{{ item }}"
+  with_items:
+    - mpm_event
+    - proxy_fcgi
+    - setenvif
+    - headers
+    - rewrite
+    - alias
+
+- name: enables the Apache2 module "mpm_event"
+  apache2_module:
+    state: present
+    name: mpm_event
+
+- name: Configure Apache virtual host
+  template:
+    src: vhost.conf.j2
+    dest: "/etc/apache2/sites-available/{{ http_domain_name }}.conf"
+    mode: 0644
+    owner: root
+    group: root
+  notify: Restart Apache
+
+- name: Add {{ app_user }} user to apache group
+  user:
+    name: "{{ app_user }}"
+    groups: www-data
+    append: yes
+
+- name: Configure Apache document root directory
+  file:
+    path: "/var/www/{{ http_domain_name }}"
+    state: directory
+    mode: u=rwx,g=rx,o=rx
+    owner: "{{ app_user }}"
+    group: www-data
+
+- name: Enables default Apache2 SSL site
+  command: "a2ensite {{ item }}"
+  args:
+    creates: "/etc/apache2/sites-enabled/{{ item }}.conf"
+  with_items:
+    - 000-default
+    - default-ssl
+    - "{{ http_domain_name }}"
+
+- name: Prevent access to default Apache sites
+  template:
+    src: deny-default-site.conf.j2
+    dest: "/etc/apache2/conf-available/deny-default-site.conf"
+    mode: 0644
+    owner: root
+    group: root
+  notify: Restart Apache
+
+- name: Enables default Apache2 SSL site
+  command: a2enconf deny-default-site
+  args:
+    creates: "/etc/apache2/conf-enabled/deny-default-site.conf"
+
+- name: Allow UFW port 80 and 443
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    default: deny
+    state: enabled
+  with_items:
+    - http
+    - https
+  notify: Restart UFW firewall service

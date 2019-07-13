@@ -1,0 +1,10 @@
+---
+- name: Restart MySQL server
+  service:
+    name: mysql
+    state: restarted
+
+- name: Remove temporary dump files
+  file:
+    path: "{{ mysql_dump_dir }}/"
+    state: absent
