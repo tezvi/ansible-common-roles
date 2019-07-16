@@ -55,7 +55,6 @@
 - name: Checking for existing local user SSH keys
   local_action: stat path="{{ playbook_dir }}/files/{{ item }}.key.pub"
   with_items:
-    - "{{ app_user }}"
     - "{{ admin_user }}"
   register: check_user_keys
   become: false

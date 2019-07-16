@@ -12,12 +12,17 @@
     owner: root
     group: root
 
-- name: Prevent direct root user SSH login
+- name: "Prevent direct SSH login for root and {{ app_user }} users"
   lineinfile:
     dest: /etc/ssh/sshd_config
-    regexp: '^#?PermitRootLogin'
-    line: 'PermitRootLogin no'
+    insertafter: "{{ item.after }}"
+    line: "{{ item.line }}"
     state: present
+  with_items:
+    - after: '^#?PermitRootLogin'
+      line: 'PermitRootLogin no'
+    - after: '^#DenyUsers'
+      line: "DenyUsers {{ app_user }}"
   notify: Restart SSHD service
 
 - name: Enable UFW and allow SSH only
