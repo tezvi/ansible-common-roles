@@ -1,9 +1,0 @@
-# {{ ansible_managed }}
-
-Alias /.well-known/acme-challenge/ "{{ http_document_root }}/.well-known/acme-challenge/"
-<Location "{{ http_document_root }}/.well-known/acme-challenge/">
-    AllowOverride None
-    Options MultiViews Indexes SymLinksIfOwnerMatch IncludesNoExec
-    Require method GET POST OPTIONS
-    ProxyPass / !
-</Location>
