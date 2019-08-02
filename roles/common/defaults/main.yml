@@ -9,6 +9,7 @@ default_packages:
   - htop
   - telnet
   - unattended-upgrades
+  - nmap
 user_sudo_group: "{{ 'admin' if is_rhel else 'sudo' }}"
 user_default_shell: /bin/bash
 app_user: appuser
