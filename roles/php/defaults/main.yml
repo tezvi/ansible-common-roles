@@ -38,6 +38,8 @@ php_packages:
   - php-iconv
   - php-pear
   - php-mysqli
+  - php-curl
+  - php-zip
 
 php_packages_rhel:
   - php72u-fpm-httpd
