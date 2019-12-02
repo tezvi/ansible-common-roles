@@ -9,5 +9,10 @@
     name: amavis
     state: restarted
 
+- name: Restart Dovecot
+  service:
+    name: dovecort
+    state: restarted
+
 - name: Reload newaliases
   shell: newaliases

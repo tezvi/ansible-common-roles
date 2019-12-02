@@ -11,13 +11,20 @@
       value: "{{ postfix_inet_protocols }}"
   notify: Restart Postfix
 
+- name: Enable postfix submission
+  replace:
+    path: /etc/postfix/master.cf
+    regexp: '^#submission(.*)'
+    replace: 'submission\1'
+  notify: Restart Postfix
+
 - name: Configure Postfix mailbox directory
   shell: "postconf -e 'home_mailbox={{ postfix_maildir_name }}/'"
 
 - name: Configure Postfix mailbox directory
   shell: postconf -e 'virtual_alias_maps=hash:/etc/postfix/virtual'
 
-- name: Configure PHP-FPM globally
+- name: Configure mail virtual table globally
   template:
     src: "users_virtual_table.j2"
     dest: /etc/postfix/virtual
@@ -73,3 +80,21 @@
     regexp: '^mail_location = mbox:'
     line: "mail_location = maildir:~/{{ postfix_maildir_name }}"
     state: present
+  notify: "Restart Dovecot"
+
+- name: Configure default Dovecot PAM auth mechanism
+  lineinfile:
+    dest: /etc/dovecot/conf.d/10-auth.conf
+    regexp: '^#!include auth-system.conf.ext'
+    line: "!include auth-system.conf.ext"
+    state: present
+  notify: "Restart Dovecot"
+
+- name: Disable default Dovecot passwd auth mechanism
+  lineinfile:
+    dest: /etc/dovecot/conf.d/10-auth.conf
+    regexp: '^!include auth-passwdfile.conf.ext'
+    line: "#!include auth-passwdfile.conf.ext"
+    state: present
+  notify: "Restart Dovecot"
+
