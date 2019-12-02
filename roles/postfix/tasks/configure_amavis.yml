@@ -54,8 +54,8 @@
     firstmatch: yes
     insertbefore: '^pickup'
     line: |
-      -o content_filter=
-      -o receive_override_options=no_header_body_checks
+      \t-o content_filter=
+      \t-o receive_override_options=no_header_body_checks
     state: present
   notify: Restart Postfix
 

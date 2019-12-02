@@ -19,6 +19,7 @@ postfix_install_packages:
   - postfix
   - dovecot-core
   - dovecot-imapd
+  - dovecot-pop3d
   - s-nail
   - clamav-daemon
   - amavisd-new
