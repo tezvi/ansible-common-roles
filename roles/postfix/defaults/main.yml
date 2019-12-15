@@ -40,3 +40,9 @@ postfix_install_packages:
   - unzip
   - zip
   - sa-compile
+  - opendkim
+  - opendkim-tools
+  - postfix-policyd-spf-python
+  - postfix-pcre
+
+dkim_short_domain: "{{ server_hostname }}"

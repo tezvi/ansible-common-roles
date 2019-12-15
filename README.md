@@ -179,6 +179,7 @@ Available variables:
       - emails:
           - admin@localhost
         user: "{{ app_user }}"
+    dkim_short_domain: # defaults to global web_domain or example.com
     
 ### RabbitMQ
 Installs and configures RabbitMQ message broker server. 
