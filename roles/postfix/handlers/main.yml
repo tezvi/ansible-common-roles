@@ -14,5 +14,10 @@
     name: dovecort
     state: restarted
 
+- name: Restart opendkim
+  service:
+    name: opendkim
+    state: restarted
+
 - name: Reload newaliases
   shell: newaliases

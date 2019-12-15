@@ -4,3 +4,5 @@
 - include: configure.yml
 
 - include: configure_amavis.yml
+
+- include: spf_dkim.yml

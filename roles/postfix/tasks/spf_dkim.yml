@@ -1,0 +1,142 @@
+---
+- name: Add postfix user to opendkim group
+  user:
+    name: postfix
+    groups: opendkim
+    append: yes
+
+- name: Enable policyd filter
+  blockinfile:
+    path: /etc/postfix/master.cf
+    block: |
+      policyd-spf  unix  -       n       n       -       0       spawn
+              user=policyd-spf argv=/usr/bin/policyd-spf
+  notify: Restart Postfix
+
+- name: Configure spf filters
+  lineinfile:
+    path: /etc/postfix/main.cf
+    regexp: '^smtpd_relay_restrictions\s*=\s*(.*)$'
+    state: present
+    backrefs: yes
+    line: |
+      reject_unauth_destination=\1,
+         check_policy_service unix:private/policyd-spf
+  notify: Restart Postfix
+
+- name: Add opendkim default configuration file
+  template:
+    src: "opendkim.conf.j2"
+    dest: /etc/opendkim.conf
+    mode: u=rw,go=r
+    owner: opendkim
+    group: opendkim
+  notify: Restart opendkim
+
+- name: Create directories for dkim files
+  file:
+    path: /etc/opendkim/keys
+    state: directory
+    recurse: true
+    mode: u=rw,go=r
+    owner: opendkim
+    group: opendkim
+
+- set_fact:
+    dkim_timestamp: "{{ lookup('pipe','date +%Y%m') }}"
+
+- name: Create default DKIM signing table
+  copy:
+    dest: /etc/opendkim/signing.table
+    mode: u=rw,go=r
+    owner: opendkim
+    group: opendkim
+    content: "*@{{ server_hostname }} {{ dkim_short_domain }}"
+  notify: Restart opendkim
+
+- name: Create default DKIM key table
+  copy:
+    dest: /etc/opendkim/key.table
+    mode: u=rw,go=r
+    owner: opendkim
+    group: opendkim
+    content: "{{ dkim_short_domain }} {{ server_hostname }}:{{ dkim_timestamp }}:/etc/opendkim/keys/{{ dkim_short_domain }}.private"
+  notify: Restart opendkim
+
+- name: Create default DKIM trusted hosts file
+  copy:
+    dest: /etc/opendkim/trusted.hosts
+    mode: u=rw,go=r
+    owner: opendkim
+    group: opendkim
+    content: |
+      127.0.0.1
+      ::1
+      localhost
+      {{ server_hostname }}
+  notify: Restart opendkim
+
+- stat:
+    path: "/etc/opendkim/keys/{{ server_hostname }}.private"
+  register: dkim_keys_stat
+
+- name: Generate KDIM private key
+  command: "opendkim-genkey -D /etc/opendkim/keys -b 2048 -h rsa-sha256 -r -s {{ dkim_timestamp }} -d {{ server_hostname }} -v"
+  when: not dkim_keys_stat.stat.exists
+  notify: Restart opendkim
+
+- name: Rename DKIM private key file
+  command: "mv {{ item.orig }} {{ item.dest }}"
+  with_items:
+    - orig: "{{ dkim_timestamp }}.private"
+      dest: "{{ server_hostname }}.private"
+    - orig: "{{ dkim_timestamp }}.txt"
+      dest: "{{ server_hostname }}.txt"
+  when: not dkim_keys_stat.stat.exists
+  args:
+    chdir: /etc/opendkim/keys
+
+- name: Fix file ownership
+  command: "{{ item }}"
+  with_items:
+    - chown -R opendkim:opendkim /etc/opendkim
+    - chmod -R go-rw /etc/opendkim/keys
+  when: not dkim_keys_stat.stat.exists
+
+- name: Start and enable opendkim service
+  service:
+    name: opendkim
+    state: started
+    enabled: true
+
+- name: Create postfix dkim spool
+  file:
+    path: /var/spool/postfix/opendkim
+    recurse: true
+    state: directory
+    owner: opendkim
+    group: postfix
+  notify: Restart opendkim
+
+- name: Add default opendkim config file for sockets
+  template:
+    src: "opendkim_default.j2"
+    dest: /etc/default/opendkim
+    mode: u=rw,go=r
+    owner: opendkim
+    group: opendkim
+  notify: Restart opendkim
+
+
+- name: Enable postfix opendkim milter
+  blockinfile:
+    path: /etc/postfix/main.cf
+    block: |
+      # Milter configuration
+      # OpenDKIM
+      milter_default_action = accept
+      # Postfix ≥ 2.6 milter_protocol = 6, Postfix ≤ 2.5 milter_protocol = 2
+      milter_protocol = 6
+      smtpd_milters = local:opendkim/opendkim.sock
+      non_smtpd_milters = local:opendkim/opendkim.sock
+  notify: Restart Postfix
