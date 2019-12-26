@@ -45,7 +45,9 @@
 - name: Enable amavis spam checking
   blockinfile:
     path: /etc/postfix/master.cf
-    block: "{{ lookup('file', './templates/master_amavis.cf.j2') }}"
+    block: "{{ lookup('file', '{{ role_path }}/templates/master_amavis.cf.j2') }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK amavisd spam"
+    backup: yes
   notify: Restart Postfix
 
 - name: Add extra Postfix options
@@ -53,10 +55,11 @@
     dest: /etc/postfix/master.cf
     firstmatch: yes
     insertbefore: '^pickup'
-    line: |
-      \t-o content_filter=
-      \t-o receive_override_options=no_header_body_checks
+    line: "{{ item }}"
     state: present
+  with_items:
+    - "\t-o receive_override_options=no_header_body_checks"
+    - "\t-o content_filter="
   notify: Restart Postfix
 
 - name: Lint spamassassin
