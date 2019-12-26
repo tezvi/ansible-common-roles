@@ -11,7 +11,12 @@
     block: |
       policyd-spf  unix  -       n       n       -       0       spawn
               user=policyd-spf argv=/usr/bin/policyd-spf
+    marker: "# {mark} ANSIBLE MANAGED BLOCK policyd filter"
   notify: Restart Postfix
+
+- name: Probe smtpd_relay_restrictions config
+  command: cat /etc/postfix/main.cf
+  register: postfix_config
 
 - name: Configure spf filters
   lineinfile:
@@ -19,9 +24,8 @@
     regexp: '^smtpd_relay_restrictions\s*=\s*(.*)$'
     state: present
     backrefs: yes
-    line: |
-      reject_unauth_destination=\1,
-         check_policy_service unix:private/policyd-spf
+    line: smtpd_relay_restrictions=\1 check_policy_service unix:private/policyd-spf reject
+  when: postfix_config.stdout.find('smtpd_relay_restrictions') != -1
   notify: Restart Postfix
 
 - name: Add opendkim default configuration file
@@ -42,9 +46,6 @@
     owner: opendkim
     group: opendkim
 
-- set_fact:
-    dkim_timestamp: "{{ lookup('pipe','date +%Y%m') }}"
-
 - name: Create default DKIM signing table
   copy:
     dest: /etc/opendkim/signing.table
@@ -60,7 +61,7 @@
     mode: u=rw,go=r
     owner: opendkim
     group: opendkim
-    content: "{{ dkim_short_domain }} {{ server_hostname }}:{{ dkim_timestamp }}:/etc/opendkim/keys/{{ dkim_short_domain }}.private"
+    content: "{{ dkim_short_domain }} {{ server_hostname }}:{{ dkim_selector }}:/etc/opendkim/keys/{{ dkim_selector }}.private"
   notify: Restart opendkim
 
 - name: Create default DKIM trusted hosts file
@@ -77,24 +78,13 @@
   notify: Restart opendkim
 
 - stat:
-    path: "/etc/opendkim/keys/{{ server_hostname }}.private"
+    path: "/etc/opendkim/keys/{{ dkim_selector }}.private"
   register: dkim_keys_stat
 
 - name: Generate KDIM private key
-  command: "opendkim-genkey -D /etc/opendkim/keys -b 2048 -h rsa-sha256 -r -s {{ dkim_timestamp }} -d {{ server_hostname }} -v"
+  command: "opendkim-genkey -D /etc/opendkim/keys -b 2048 -h rsa-sha256 -r -s {{ dkim_selector }} -d {{ server_hostname }} -v"
   when: not dkim_keys_stat.stat.exists
   notify: Restart opendkim
-
-- name: Rename DKIM private key file
-  command: "mv {{ item.orig }} {{ item.dest }}"
-  with_items:
-    - orig: "{{ dkim_timestamp }}.private"
-      dest: "{{ server_hostname }}.private"
-    - orig: "{{ dkim_timestamp }}.txt"
-      dest: "{{ server_hostname }}.txt"
-  when: not dkim_keys_stat.stat.exists
-  args:
-    chdir: /etc/opendkim/keys
 
 - name: Fix file ownership
   command: "{{ item }}"
