@@ -46,3 +46,5 @@ postfix_install_packages:
   - postfix-pcre
 
 dkim_short_domain: "{{ server_hostname }}"
+# You can use year-month value like this "{{ lookup('pipe','date +%Y%m') }}".
+dkim_selector: default
