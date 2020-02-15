@@ -32,6 +32,16 @@
     owner: root
     group: root
 
+- name: Configure SMTPd relay restrictions
+  lineinfile:
+    path: /etc/postfix/main.cf
+    regexp: '^smtpd_relay_restrictions\s*=\s*(.*)$'
+    state: present
+    backrefs: yes
+    line: smtpd_relay_restrictions=permit_mynetworks permit_sasl_authenticated permit_auth_destination
+  when: postfix_config.stdout.find('smtpd_relay_restrictions') != -1
+  notify: Restart Postfix
+
 - name: Apply users virtual email configuration
   shell: postmap /etc/postfix/virtual
   notify: Restart Postfix
