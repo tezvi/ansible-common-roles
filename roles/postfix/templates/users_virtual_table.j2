@@ -1,6 +1,6 @@
 # {{ ansible_managed }}
 {% for item in postfix_virtual_user_map %}
-    {% for email in item.emails %}
+    {%- for email in item.emails %}
 {{ email }} {{ item.user }}
     {% endfor %}
 {% endfor %}
