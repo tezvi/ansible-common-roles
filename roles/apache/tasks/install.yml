@@ -1,8 +1,11 @@
 ---
-- name: Install Apache
+- name: Install Apache and modules
   apt:
     name: apache2
     state: latest
+  with_items:
+    - apache2
+    - xsendfile
 
 - name: Start Apache web server
   service:
