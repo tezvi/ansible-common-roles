@@ -8,6 +8,7 @@
 - include: install_packages.yml
 - include: configure_environment.yml
 - include: configure_user.yml
+  when: app_user is defined and admin_user is defined
 
 - include: configure_autoupdates.yml
   when: unattended_upgrades_enable
