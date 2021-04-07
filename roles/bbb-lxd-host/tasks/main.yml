@@ -1,0 +1,43 @@
+---
+
+- name: Install LXD via snap
+  snap:
+    name: lxd
+    state: present
+
+- name: Install LXC packages
+  apt:
+    name: "{{ bbb_lxd_host_packages }}"
+    state: latest
+
+- name: Initialize LXD
+  shell: "lxd init --auto"
+
+- name: Detect default ethernet interface
+  shell: 'ip route show default 0.0.0.0/0 | cut -d" " -f5'
+  register: default_route_iface
+
+- fail:
+    msg: 'Could not determine default route network interface'
+  when: not default_route_iface.stdout|length
+
+- command:
+    cmd: 'lxc profile show {{ bbb_lxd_profile }}'
+  ignore_errors: true
+  register: exists_lxd_profile
+
+- name: Configure default BBB LXD profile
+  command:
+    cmd: '{{ item }}'
+  with_items:
+    - 'lxc profile copy default {{ bbb_lxd_profile }}'
+    - 'lxc profile device remove {{ bbb_lxd_profile }} eth0'
+    - 'lxc profile device add {{ bbb_lxd_profile }} eth0 nic nictype=macvlan parent={{ default_route_iface.stdout }}'
+    - 'lxc profile set {{ bbb_lxd_profile }} security.nesting=true'
+  when: exists_lxd_profile.rc != 0
+
+- include_tasks: create_shared_volume.yml
+  when: bbb_lxd_storage_shared|length
+
+- include_tasks: create_bridged_network.yml
+  when: bbb_lxd_bridged_network and bbb_lxd_bridged_network|length
