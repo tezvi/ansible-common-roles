@@ -1,0 +1,225 @@
+---
+
+- block:
+  - command: 'lxc exec {{ lxc_instance.name }} -- which bbb-conf'
+    ignore_errors: true
+    register: bbb_lxc_installed_stat
+
+  - name: '{{ lxc_instance.name }}: Install BBB'
+    command:
+      cmd: "lxc exec {{ lxc_instance.name }} -- sh -c '{{ item }}'"
+    retries: 0
+    with_items:
+      - 'wget -O /root/bbb-install.sh {{ bbb_lxc_bbb_install_url }}'
+      - '/bin/bash /root/bbb-install.sh -v xenial-22 -w -s {{ lxc_instance.hostname }} -e {{ lxc_instance.email }}'
+      # Install homedir skeleton if omitted by install script. This might pile web error logs.
+      - 'mkhomedir_helper bigbluebutton'
+      - 'mkdir -p /home/bigbluebutton/.cache/dconf'
+      - 'apt-get purge bbb-demo -y || echo "no BBB demos installed"'
+      - 'apt-get autoremove -y'
+    when: bbb_lxc_force_bbb_install|bool or bbb_lxc_installed_stat.rc != 0
+
+  - import_tasks: link_bbb_dir.yml
+
+    # Install homedir skeleton if omitted by install script. This might pile web error logs.
+  - name: '{{ lxc_instance.name }}: Fix bigbluebutton user homedir skeleton for'
+    command:
+      cmd: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'
+    with_items:
+      - 'mkhomedir_helper bigbluebutton'
+      - 'mkdir -p /home/bigbluebutton/.cache/dconf'
+      - 'chown -R bigbluebutton:bigbluebutton /home/bigbluebutton/.cache'
+
+  - name: '{{ lxc_instance.name }}: Copy BBB config files to host for provisioning'
+    command:
+      cmd: 'lxc file pull {{ lxc_instance.name }}{{ item }}'
+    with_items:
+      - '{{ bbb_lxc_bbb_properties_file }} {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bigbluebutton.properties'
+      - '{{ bbb_lxc_bbb_html5unit_file }} {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_html5unit'
+
+  - copy:
+      src: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item }}"
+      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item }}.orig"
+      remote_src: true
+    with_items:
+      - 'bigbluebutton.properties'
+      - 'html5unit'
+
+  - name: '{{ lxc_instance.name }}: Provision BBB properties file'
+    lineinfile:
+      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bigbluebutton.properties"
+      regexp: "{{ item.find }}"
+      line: "{{ item.replace }}"
+      state: present
+    with_items:
+      - find: 'lockSettingsDisablePrivateChat=false'
+        replace: 'lockSettingsDisablePrivateChat=true'
+      - find: 'webcamsOnlyForModerator=false'
+        replace: 'webcamsOnlyForModerator=true'
+      - find: 'lockSettingsDisableNote=false'
+        replace: 'lockSettingsDisableNote=true'
+      - find: 'lockSettingsHideUserList=false'
+        replace: 'lockSettingsHideUserList=true'
+      - find: 'endWhenNoModerator=false'
+        replace: 'endWhenNoModerator=true'
+      - find: 'breakoutRoomsRecord=true'
+        replace: 'breakoutRoomsRecord=false'
+      - find: 'disableRecordingDefault=true'
+        replace: 'disableRecordingDefault=false'
+      - find: 'muteOnStart=false'
+        replace: 'muteOnStart=true'
+
+  - name: '{{ lxc_instance.name }}: Provision BBB html5 unit file'
+    lineinfile:
+      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_html5unit"
+      regexp: "{{ item.find }}"
+      line: "{{ item.replace }}"
+      state: present
+    with_items:
+      - find: 'CPUSchedulingPolicy=fifo'
+        replace: '#CPUSchedulingPolicy=fifo'
+
+  - command:
+      cmd: >-
+        diff {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item }}
+        {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item }}.orig
+    register: bbb_lxc_config_diff
+    ignore_errors: true
+    with_items:
+      - 'bigbluebutton.properties'
+      - 'html5unit'
+
+  - name: '{{ lxc_instance.name }}: Push new BBB properties file'
+    command:
+      cmd: 'lxc {{ item }}'
+    with_items:
+      - 'exec {{ lxc_instance.name }} -- cp -f {{ bbb_lxc_bbb_properties_file }} {{ bbb_lxc_bbb_properties_file }}.bak'
+      - 'file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bigbluebutton.properties {{ lxc_instance.name }}{{ bbb_lxc_bbb_properties_file }}'
+    register: bbb_lxc_properties_changed_stat
+    when: bbb_lxc_config_diff.results[0].rc != 0
+
+  - name: '{{ lxc_instance.name }}: Push new BBB HTML5 systemd unit file'
+    command:
+      cmd: 'lxc {{ item }}'
+    with_items:
+      - 'exec {{ lxc_instance.name }} -- cp -f {{ bbb_lxc_bbb_html5unit_file }} {{ bbb_lxc_bbb_html5unit_file }}.bak'
+      - 'file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_html5unit {{ lxc_instance.name }}{{ bbb_lxc_bbb_html5unit_file }}'
+      - 'exec {{ lxc_instance.name }} -- systemctl daemon-reload'
+    register: bbb_lxc_html5_changed_stat
+    when: bbb_lxc_config_diff.results[1].rc != 0
+
+  - command: 'lxc exec {{ lxc_instance.name }} -- ls {{ bbb_lxc_bbb_index_file }}.orig'
+    ignore_errors: true
+    register: bbb_lxc_index_placeholder_stat
+
+  - name: '{{ lxc_instance.name }}: Copy default BBB index placeholder'
+    template:
+      src: bbb/index.html.j2
+      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_index.html"
+      mode: 0644
+    when: bbb_lxc_bbb_redirect_url|length and bbb_lxc_index_placeholder_stat.rc != 0
+
+  - name: '{{ lxc_instance.name }}: Push default BBB index placeholder to container'
+    command: 'lxc {{ item }}'
+    with_items:
+      - 'exec {{ lxc_instance.name }} -- mv {{ bbb_lxc_bbb_index_file }} {{ bbb_lxc_bbb_index_file }}.orig'
+      - 'file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_index.html {{ lxc_instance.name }}{{ bbb_lxc_bbb_index_file }}'
+      - 'exec {{ lxc_instance.name }} -- systemctl restart nginx'
+    when: bbb_lxc_bbb_redirect_url|length and bbb_lxc_index_placeholder_stat.rc != 0
+
+  - block:
+    - name: '{{ lxc_instance.name }}: Copy recording unit timer config file'
+      template:
+        src: bbb/recording-unit.timer.conf.j2
+        dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_record_systemd_timer.yml"
+        mode: 0644
+
+    - name: '{{ lxc_instance.name }}: Offload bbb-record systemd unit out of working hours'
+      command:
+        cmd: 'lxc {{ item }}'
+      with_items:
+        - "exec {{ lxc_instance.name }} -- sh -c 'mkdir -p $(dirname {{ bbb_lxc_recording_timer_file }}) || echo \"Dir already exists\"'"
+        - 'file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_record_systemd_timer.yml {{ lxc_instance.name }}{{ bbb_lxc_recording_timer_file }}'
+        - 'exec {{ lxc_instance.name }} -- systemctl daemon-reload'
+    when: bbb_lxc_recording_timer_enabled
+
+  - name: '{{ lxc_instance.name }}: Remove recording unit systemd timer'
+    command:
+      cmd: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'
+    with_items:
+      - 'rm {{ bbb_lxc_recording_timer_file }}'
+      - 'systemctl daemon-reload'
+    ignore_errors: true
+    when: not bbb_lxc_recording_timer_enabled
+
+  - name: '{{ lxc_instance.name }}: Template apply-conf script'
+    template:
+      src: bbb/apply-conf.sh.j2
+      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_apply_conf.sh"
+      mode: 0644
+
+  - name: '{{ lxc_instance.name }}: Check existence of apply-conf script'
+    command:
+      cmd: '{{ item }}'
+    with_items:
+      - 'lxc file pull {{ lxc_instance.name }}/etc/bigbluebutton/bbb-conf/apply-config.sh {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_apply_conf.sh.orig'
+      - 'diff {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_apply_conf.sh {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_apply_conf.sh.orig'
+    ignore_errors: true
+    register: bbb_lxc_apply_conf_stat
+
+  - name: '{{ lxc_instance.name }}: Deploy apply config BBB script'
+    command:
+      cmd: 'lxc {{ item }}'
+    when: bbb_lxc_apply_conf_stat.results[0].rc != 0 or bbb_lxc_apply_conf_stat.results[1].rc != 0
+    register: bbb_lxc_apply_script_changed_stat
+    with_items:
+      - "exec {{ lxc_instance.name }} -- sh -c 'cd /etc/bigbluebutton/bbb-conf; cp apply-config.sh apply-config.sh.orig'"
+      - 'file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_apply_conf.sh {{ lxc_instance.name }}/etc/bigbluebutton/bbb-conf/apply-config.sh'
+      - 'exec {{ lxc_instance.name }} -- chmod +x /etc/bigbluebutton/bbb-conf/apply-config.sh'
+
+  - name: '{{ lxc_instance.name }}: Check local default slides existence'
+    local_action: stat path="{{ bbb_lxc_local_slides_dir }}/{{ item }}"
+    become: false
+    with_items: '{{ bbb_lxc_local_slides }}'
+    when: bbb_lxc_local_slides|length > 0
+    register: bbb_lxc_local_slides_stat
+
+  - set_fact:
+      bbb_lxc_slides_available: |-
+        {{ bbb_lxc_local_slides|length > 0 and bbb_lxc_local_slides_stat.results[0].stat.exists
+        and bbb_lxc_local_slides_stat.results[1].stat.exists }}
+
+  - debug:
+      msg: 'Local slides PDF and PPTX files are not available at path {{ bbb_lxc_local_slides_dir }}'
+    when: not bbb_lxc_slides_available|bool
+
+  - block:
+    - name: '{{ lxc_instance.name }}: Copy default presentation PDF slides'
+      copy:
+        src: '{{ bbb_lxc_local_slides_dir }}/{{ item }}'
+        dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item }}'
+      with_items: '{{ bbb_lxc_local_slides }}'
+    - name: '{{ lxc_instance.name }}: Deploy default presentation PDF slides'
+      command:
+        cmd: 'lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item }} {{ lxc_instance.name }}/var/www/bigbluebutton-default/{{ item }}'
+      with_items: '{{ bbb_lxc_local_slides }}'
+    when: bbb_lxc_slides_available|bool
+
+  - name: '{{ lxc_instance.name }}: Check if UFW is enabled'
+    shell: "lxc exec {{ lxc_instance.name }} -- sh -c \"ufw status | grep 'Status: active'\""
+
+  - set_fact:
+      bbb_lxc_will_restart: |-
+        {{ bbb_lxc_properties_changed_stat.changed or bbb_lxc_html5_changed_stat.changed
+        or bbb_lxc_apply_script_changed_stat.changed }}
+
+  - import_tasks: restart_bbb.yml
+    when: bbb_lxc_will_restart|bool
+
+  - import_tasks: check_instance.yml
+    when: not bbb_lxc_will_restart|bool
+
+  always:
+    - name: '{{ lxc_instance.name }}: Remove temporary container files'
+      shell: 'rm {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_*'
+      ignore_errors: true

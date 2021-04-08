@@ -1,0 +1,21 @@
+---
+
+- name: Detect default ethernet interface
+  shell: 'ip route show default 0.0.0.0/0 | cut -d" " -f5'
+  register: stat_default_route_iface
+
+- fail:
+    msg: 'Could not determine default route network interface'
+  when: not stat_default_route_iface.stdout|length
+
+- set_fact:
+    default_route_iface: '{{ stat_default_route_iface.stdout }}'
+
+- name: Create LXD instances
+  include_tasks: create_instance.yml
+  loop: '{{ bbb_lxc_instances }}'
+  loop_control:
+    loop_var: lxc_instance
+
+- include_tasks: install_bbb_instances.yml
+

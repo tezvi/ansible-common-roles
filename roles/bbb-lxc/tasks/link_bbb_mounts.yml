@@ -1,0 +1,8 @@
+---
+
+- name: Link BBB directory mounts
+  include_tasks: bbb/link_bbb_dir.yml
+  when: lxc_instance.install_bbb|default(false)
+  loop: '{{ bbb_lxc_instances }}'
+  loop_control:
+    loop_var: lxc_instance

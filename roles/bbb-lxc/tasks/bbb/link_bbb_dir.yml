@@ -1,0 +1,42 @@
+---
+# Add new lxc storage volume then mount as /opt/bigbluebutton/bbbx and symlink to /var/bigbluebutton
+# Copy previous files if exists and then fix and test file permissions
+
+- command:
+    cmd: "lxc exec {{ lxc_instance.name }} -- sh -c '{{ item }}'"
+  with_items:
+    - "if [ -d /var/bigbluebutton ] && [ ! -L /var/bigbluebutton ]; then echo exists; fi"
+    - "readlink -n /var/bigbluebutton/"
+    - "ls /var/bigbluebutton/"
+  register: stat_lxc_instance_bbb_dir
+  ignore_errors: true
+
+- set_fact:
+    lxc_instance_bbbshared_path: '{{ bbb_lxc_shared_dir }}/{{ lxc_instance.name }}'
+    lxc_instance_link_exists: '{{ stat_lxc_instance_bbb_dir.results[1].rc == 0 and stat_lxc_instance_bbb_dir.results[1].stdout == lxc_instance_bbbshared_path }}'
+    lxc_instance_bbbdir_exists: "{{ stat_lxc_instance_bbb_dir.results[0].stdout == 'exists' }}"
+
+- block:
+    - name: '{{ lxc_instance.name }}: Create bigbluebutton shared dir'
+      command: 'lxc exec {{ lxc_instance.name }} -- mkdir -p {{ lxc_instance_bbbshared_path }}/bigbluebutton'
+
+    - name: '{{ lxc_instance.name }}: Copy existing bigbluebutton dir to shared mount point'
+      command:
+        cmd: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'
+      with_items:
+        - 'cp -rf /var/bigbluebutton {{ lxc_instance_bbbshared_path }}'
+        - 'rm -rf /var/bigbluebutton'
+      when: lxc_instance_bbbdir_exists|bool
+
+    - name: '{{ lxc_instance.name }}: Create bbb shared dir symlink to /var/bigbluebutton'
+      command:
+        cmd: 'lxc exec {{ lxc_instance.name }} -- ln -nsf {{ lxc_instance_bbbshared_path }}/bigbluebutton /var/bigbluebutton'
+      when: not lxc_instance_link_exists|bool
+
+    - name: '{{ lxc_instance.name }}: Fix link target bbb dir permissions'
+      command:
+        cmd: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'
+      with_items:
+        - 'chown -R bigbluebutton:bigbluebutton /var/bigbluebutton/'
+        - 'chown -R red5:red5 /var/bigbluebutton/screenshare'
+  when: stat_lxc_instance_bbb_dir.results[2].rc == 0

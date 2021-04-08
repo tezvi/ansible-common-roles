@@ -1,0 +1,22 @@
+---
+
+- name: '{{ lxc_instance.name }}: Health check BBB services'
+  command: 'lxc exec {{ lxc_instance.name }} -- sh -c "bbb-conf --status | grep failed"'
+  register: bbb_lxc_services_stat
+  ignore_errors: true
+
+- fail:
+    msg: >-
+      Some service has failed to start for BBB instance {{ lxc_instance.name }}
+      with error "{{ bbb_lxc_services_stat.stdout|trim|join('; ') }}
+  when: bbb_lxc_services_stat.rc == 0
+
+- name: '{{ lxc_instance.name }}: Check if BBB instance API is responsive'
+  local_action:
+    module: ansible.builtin.uri
+    url: "https://{{ lxc_instance.hostname }}/bigbluebutton/api"
+    return_content: yes
+    status_code: 200
+  register: response
+  become: none
+  failed_when: "response.failed or 'SUCCESS' not in response.content"

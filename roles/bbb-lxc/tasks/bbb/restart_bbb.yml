@@ -1,0 +1,7 @@
+---
+
+- name: '{{ lxc_instance.name }}: Restart BBB'
+  command:
+    cmd: 'lxc exec {{ lxc_instance.name }} -- bbb-conf --restart'
+
+- include_tasks: check_instance.yml
