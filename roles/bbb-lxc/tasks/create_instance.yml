@@ -1,0 +1,96 @@
+---
+
+- command:
+    cmd: 'lxc info {{ lxc_instance.name }}'
+  ignore_errors: true
+  register: exists_lxc_instance
+
+- fail:
+    msg: Container instance name cannot be empty
+  when: not lxc_instance.name|length
+
+- name: 'Create and provision LXC instance {{ lxc_instance.name }}'
+  block:
+    - name: '{{ lxc_instance.name }}: Creating LXC instance'
+      command:
+        cmd: 'lxc launch {{ lxc_instance.image }} {{ lxc_instance.name }} -p {{ lxc_instance.profile }} -n {{ default_route_iface }}'
+      when: exists_lxc_instance.rc != 0
+
+    - name: '{{ lxc_instance.name }}: Configure nested security to LXC container'
+      command: 'lxc config set {{ lxc_instance.name }} security.nesting true'
+
+    - name: '{{ lxc_instance.name }}: Detect hostname'
+      command: "lxc exec {{ lxc_instance.name }} -- cat /etc/hostname"
+      register: lxc_instance_host_stat
+
+    - name: '{{ lxc_instance.name }}: Configure container hostname'
+      command: "lxc exec {{ lxc_instance.name }} -- sh -c 'echo -n \"{{ lxc_instance.hostname }}\" > /etc/hostname'"
+      when: lxc_instance_host_stat.stdout|trim != lxc_instance.hostname
+
+    - name: '{{ lxc_instance.name }}: Copy network configuration template'
+      template:
+        src: "{{ item.template }}"
+        dest: "{{ item.dest }}"
+        mode: 0644
+      with_items:
+        - template: network-interface.cfg.j2
+          dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_network.cfg"
+        - template: 99-disable-network-config.cfg.j2
+          dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_99-disable-network-config.cfg"
+        - template: bash_aliases.j2
+          dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bash_aliases"
+
+    - name: '{{ lxc_instance.name }}: Configure container network interface'
+      command:
+        cmd: "lxc file push {{ item }}"
+      with_items:
+        - '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_network.cfg {{ lxc_instance.name }}/etc/network/interfaces.d/50-bbb-macvlan.cfg'
+        - '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_99-disable-network-config.cfg {{ lxc_instance.name }}/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg'
+        - '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bash_aliases {{ lxc_instance.name }}/root/.bash_aliases'
+
+    - name: '{{ lxc_instance.name }}: Remove container network cloud config'
+      command:
+        cmd: 'lxc exec {{ lxc_instance.name }} rm /etc/network/interfaces.d/50-cloud-init.cfg'
+      ignore_errors: true
+
+    - name: '{{ lxc_instance.name }}: Restart container'
+      command:
+        cmd: 'lxc restart {{ lxc_instance.name }}'
+
+    - name: '{{ lxc_instance.name }}: Check internet connection'
+      command:
+        cmd: 'lxc exec {{ lxc_instance.name }} -- ping -c1 google.com'
+      retries: 3
+      delay: 5
+
+    - name: '{{ lxc_instance.name }}: Update installed apt packages and cache'
+      command:
+        cmd: "lxc exec {{ lxc_instance.name }} -- {{ item }}"
+      with_items:
+        - 'dpkg --configure -a'
+        - 'apt-get update'
+        - 'apt-get upgrade -y --force-yes'
+        - 'apt-get autoremove -y --force-yes'
+      # apt tasks can have locks acquired from other processes, retry several times before giving up.
+      retries: 3
+      delay: 30
+
+    - name: '{{ lxc_instance.name }}: Install default tools and utilities'
+      command:
+        cmd: "lxc exec {{ lxc_instance.name }} -- apt-get install {{ item }} -y --force-yes"
+      with_items: "{{ bbb_lxc_default_packages }}"
+
+    - name: '{{ lxc_instance.name }}: Configure global git user'
+      command:
+        cmd: 'lxc exec {{ lxc_instance.name }} -- git config --global {{ item }}'
+      with_items:
+        - 'user.name "{{ lxc_instance.name }}"'
+        - 'user.email "{{ lxc_instance.email }}"'
+      when: "'git' in bbb_lxc_default_packages"
+
+    - import_tasks:  install_docker.yml
+
+  always:
+    - name: '{{ lxc_instance.name }}: Remove temporary container files'
+      shell: 'rm {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_*'
+      ignore_errors: true

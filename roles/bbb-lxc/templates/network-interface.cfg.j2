@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+auto eth0
+iface eth0 inet static
+address {{ lxc_instance.ip_address }}
+netmask {{ lxc_instance.net_mask }}
+network {{ lxc_instance.network_ip }}
+broadcast {{ lxc_instance.broadcast }}
+gateway {{ lxc_instance.default_route }}
+dns-nameservers {{ lxc_instance.dns_servers|join(' ') }}
+
+{% if bbb_lxc_net_bridged %}
+auto eth2
+iface eth2 inet dhcp
+{% endif %}

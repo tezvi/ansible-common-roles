@@ -256,6 +256,77 @@ bbb_lxd_storage_pool: bigbluebutton
 
 # Host OS path where LXC storage pool is created. Leave empty and role will not create new storage pool.
 bbb_lxd_storage_pool_dir: ''
+```        
+
+### BigBlueButton LXC instance (bbb-lxc)
+Installs and configures BigBlueButton LXC instances for load balanced usage. Many other features are installed. Check options bellow. 
+
+Available variables:
+
+```yaml
+---
+# URL path to official BBB bash install script
+bbb_lxc_bbb_install_url: 'https://ubuntu.bigbluebutton.org/bbb-install.sh'
+# If set BBB will automatically redirect user to this url for default document root
+bbb_lxc_bbb_redirect_url:
+# Path of index file for default document root
+bbb_lxc_bbb_index_file: '/var/www/bigbluebutton-default/index.html'
+# Path to BBB properties file
+bbb_lxc_bbb_properties_file: '/usr/share/bbb-web/WEB-INF/classes/bigbluebutton.properties'
+# Path to HTML5 systemd unit file
+bbb_lxc_bbb_html5unit_file: '/usr/lib/systemd/system/bbb-html5.service'
+# If true container will be configured for local network
+bbb_lxc_net_bridged: true
+# If true role will force BBB install script even if BBB has already been installed
+bbb_lxc_force_bbb_install: false
+# Temporary directory to use on host OS for template processing
+bbb_lxc_tmp_dir: /tmp
+# If true recordings will be processed only out of working hours
+bbb_lxc_recording_timer_enabled: true
+# Path to recording timer file for systemd scheduling
+bbb_lxc_recording_timer_file: /etc/systemd/system/bbb-record-core.timer.d/override.conf
+# If true multiple kurentos instances will be configured via BBB install script
+bbb_lxc_multiple_kurentos: true
+# Optional HTML5 document title to shot in browser
+bbb_lxc_html5_title: ''
+# Path to BBB shared directory
+bbb_lxc_shared_dir: /opt/bbbshared/instances
+# Path to playbook local directory where default slides are located
+bbb_lxc_local_slides_dir: '{{ playbook_dir }}/../files/bbb'
+# Array of default slide files to copy to BBB configuration
+bbb_lxc_local_slides:
+  - 'default.pptx'
+  - 'default.pdf'
+
+# List of default yum packages to install on BBB LXC instance
+bbb_lxc_default_packages:
+  - vim
+  - git
+  - tree
+  - screen
+  - htop
+  - telnet
+  - unattended-upgrades
+  - nmap
+  - etckeeper
+  - net-tools
+  - stress
+  - bc
+
+# List of LXC instances. See example bellow.
+bbb_lxc_instances: []
+#  - name: bbbmeet
+#    hostname:
+#    email:
+#    ip_address:
+#    network_ip:
+#    net_mask:
+#    broadcast:
+#    install_bbb: false
+#    default_route:
+#    dns_servers:
+#    profile:
+#    image:
 ```
     
 ### Wkhtml

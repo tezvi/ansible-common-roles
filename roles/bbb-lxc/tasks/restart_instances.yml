@@ -1,0 +1,8 @@
+---
+
+- name: Restart BBB instances
+  include_tasks: bbb/restart_bbb.yml
+  loop: '{{ bbb_lxc_instances }}'
+  when: lxc_instance.install_bbb|default(false)
+  loop_control:
+    loop_var: lxc_instance

@@ -1,0 +1,18 @@
+#!/bin/bash
+# {{ ansible_managed }}
+
+# Pull in the helper functions for configuring BigBlueButton
+source /etc/bigbluebutton/bbb-conf/apply-lib.sh
+
+enableUFWRules
+{% if bbb_lxc_multiple_kurentos %}
+enableMultipleKurentos
+{% else %}
+disableMultipleKurentos
+{% endif %}
+
+{% if bbb_lxc_html5_title and bbb_lxc_html5_title|length %}
+METEOR_SETTINGS_FILE=/usr/share/meteor/bundle/programs/server/assets/app/config/settings.yml
+yq w -i $METEOR_SETTINGS_FILE public.app.clientTitle "{{ bbb_lxc_html5_title }}"
+chown meteor:meteor $METEOR_SETTINGS_FILE
+{% endif %}
