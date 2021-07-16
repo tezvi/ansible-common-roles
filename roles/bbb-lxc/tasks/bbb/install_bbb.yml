@@ -11,7 +11,7 @@
     retries: 0
     with_items:
       - 'wget -O /root/bbb-install.sh {{ bbb_lxc_bbb_install_url }}'
-      - '/bin/bash /root/bbb-install.sh -v xenial-22 -w -s {{ lxc_instance.hostname }} -e {{ lxc_instance.email }}'
+      - '/bin/bash /root/bbb-install.sh -v {{ lxc_instance.bbb_version }} -w -s {{ lxc_instance.hostname }} -e {{ lxc_instance.email }}'
       # Install homedir skeleton if omitted by install script. This might pile web error logs.
       - 'mkhomedir_helper bigbluebutton'
       - 'mkdir -p /home/bigbluebutton/.cache/dconf'
@@ -30,24 +30,43 @@
       - 'mkdir -p /home/bigbluebutton/.cache/dconf'
       - 'chown -R bigbluebutton:bigbluebutton /home/bigbluebutton/.cache'
 
+  - set_fact:
+      bbb_template_files:
+        - src: '{{ bbb_lxc_bbb_properties_file }}'
+          dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bigbluebutton.properties'
+        - src: '{{ bbb_lxc_bbb_properties_file }}'
+          dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_freeswitch_vars.xml'
+        - src: '{{ bbb_lxc_bbb_html5unit_file }}'
+          dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bbb-html5.service'
+    when: lxc_instance.bbb_version == 'xenial-22'
+
+  - set_fact:
+      bbb_template_files:
+        - src: '{{ bbb_lxc_bbb_properties_file }}'
+          dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bigbluebutton.properties'
+        - src: '{{ bbb_lxc_bbb_freeswitch_config_file }}'
+          dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_freeswitch_vars.xml'
+        - src: '{{ bbb_lxc_systemd_unit_dir }}/bbb-html5-backend@.service'
+          dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bbb-html5-backend@.service'
+        - src: '{{ bbb_lxc_systemd_unit_dir }}/bbb-html5-frontend@.service'
+          dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bbb-html5-frontend@.service'
+    when: lxc_instance.bbb_version == 'bionic-23'
+
   - name: '{{ lxc_instance.name }}: Copy BBB config files to host for provisioning'
     command:
-      cmd: 'lxc file pull {{ lxc_instance.name }}{{ item }}'
-    with_items:
-      - '{{ bbb_lxc_bbb_properties_file }} {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bigbluebutton.properties'
-      - '{{ bbb_lxc_bbb_html5unit_file }} {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_html5unit'
+      cmd: 'lxc file pull {{ lxc_instance.name }}{{ item.src }} {{ item.dest }}'
+    with_items: "{{ bbb_template_files }}"
 
-  - copy:
-      src: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item }}"
-      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item }}.orig"
+  - name: '{{ lxc_instance.name }}: Make backups of template source files'
+    copy:
+      src: "{{ item.dest }}"
+      dest: "{{ item.dest }}.orig"
       remote_src: true
-    with_items:
-      - 'bigbluebutton.properties'
-      - 'html5unit'
+    with_items: "{{ bbb_template_files }}"
 
   - name: '{{ lxc_instance.name }}: Provision BBB properties file'
     lineinfile:
-      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bigbluebutton.properties"
+      dest: "{{ bbb_template_files[0].dest }}"
       regexp: "{{ item.find }}"
       line: "{{ item.replace }}"
       state: present
@@ -71,41 +90,56 @@
 
   - name: '{{ lxc_instance.name }}: Provision BBB html5 unit file'
     lineinfile:
-      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_html5unit"
-      regexp: "{{ item.find }}"
-      line: "{{ item.replace }}"
+      dest: "{{ item.0.dest }}"
+      regexp: "{{ item.1.find }}"
+      line: "{{ item.1.replace }}"
       state: present
-    with_items:
-      - find: 'CPUSchedulingPolicy=fifo'
-        replace: '#CPUSchedulingPolicy=fifo'
+    with_nested:
+      - "{{ bbb_template_files[2:] }}"
+      - [{find: 'CPUSchedulingPolicy=fifo',
+          replace: '#CPUSchedulingPolicy=fifo'}]
+
+  - name: '{{ lxc_instance.name }}: Provision Freeswitch public ip'
+    replace:
+      dest: "{{ bbb_template_files[1].dest }}"
+      regexp: '"local_ip_v4=([\.\d]+)"'
+      replace: '"local_ip_v4={{ lxc_instance.ip_address }}"'
 
   - command:
-      cmd: >-
-        diff {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item }}
-        {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item }}.orig
+      cmd: 'diff {{ item.dest }} {{ item.dest }}.orig'
     register: bbb_lxc_config_diff
     ignore_errors: true
-    with_items:
-      - 'bigbluebutton.properties'
-      - 'html5unit'
+    with_items: "{{ bbb_template_files }}"
 
   - name: '{{ lxc_instance.name }}: Push new BBB properties file'
     command:
-      cmd: 'lxc {{ item }}'
-    with_items:
-      - 'exec {{ lxc_instance.name }} -- cp -f {{ bbb_lxc_bbb_properties_file }} {{ bbb_lxc_bbb_properties_file }}.bak'
-      - 'file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bigbluebutton.properties {{ lxc_instance.name }}{{ bbb_lxc_bbb_properties_file }}'
+      cmd: "lxc {{ item.0 | replace('%FILE%', item.1.src) | replace('%SRC%', item.1.dest) }}"
+    with_nested:
+      - ['exec {{ lxc_instance.name }} -- cp -f %FILE% %FILE%.bak',
+          'file push %SRC% {{ lxc_instance.name }}%FILE%']
+      - "{{ bbb_template_files[0:0] }}"
     register: bbb_lxc_properties_changed_stat
     when: bbb_lxc_config_diff.results[0].rc != 0
 
   - name: '{{ lxc_instance.name }}: Push new BBB HTML5 systemd unit file'
     command:
-      cmd: 'lxc {{ item }}'
-    with_items:
-      - 'exec {{ lxc_instance.name }} -- cp -f {{ bbb_lxc_bbb_html5unit_file }} {{ bbb_lxc_bbb_html5unit_file }}.bak'
-      - 'file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_html5unit {{ lxc_instance.name }}{{ bbb_lxc_bbb_html5unit_file }}'
-      - 'exec {{ lxc_instance.name }} -- systemctl daemon-reload'
+      cmd: "lxc {{ item.0 | replace('%FILE%', item.1.src) | replace('%SRC%', item.1.dest) }}"
+    with_nested:
+      - ['exec {{ lxc_instance.name }} -- cp -f %FILE% %FILE%.bak',
+         'file push %SRC% {{ lxc_instance.name }}%FILE%',
+         'exec {{ lxc_instance.name }} -- systemctl daemon-reload']
+      - "{{ bbb_template_files[2:] }}"
     register: bbb_lxc_html5_changed_stat
+    when: bbb_lxc_config_diff.results[2].rc != 0 or bbb_lxc_config_diff.results[3].rc|default(0) != 0
+
+  - name: '{{ lxc_instance.name }}: Push new Freeswitch config file'
+    command:
+      cmd: "lxc {{ item.0 | replace('%FILE%', item.1.src) | replace('%SRC%', item.1.dest) }}"
+    with_nested:
+      - ['exec {{ lxc_instance.name }} -- cp -f %FILE% %FILE%.bak',
+         'file push %SRC% {{ lxc_instance.name }}%FILE%']
+      - "{{ bbb_template_files[1:2] }}"
+    register: bbb_lxc_freeswitch_changed_stat
     when: bbb_lxc_config_diff.results[1].rc != 0
 
   - command: 'lxc exec {{ lxc_instance.name }} -- ls {{ bbb_lxc_bbb_index_file }}.orig'
@@ -185,9 +219,8 @@
     register: bbb_lxc_local_slides_stat
 
   - set_fact:
-      bbb_lxc_slides_available: |-
-        {{ bbb_lxc_local_slides|length > 0 and bbb_lxc_local_slides_stat.results[0].stat.exists
-        and bbb_lxc_local_slides_stat.results[1].stat.exists }}
+      bbb_lxc_slides_available: "{{ bbb_lxc_local_slides|length > 0 and bbb_lxc_local_slides_stat.results[0].stat.exists
+          and bbb_lxc_local_slides_stat.results[1].stat.exists }}"
 
   - debug:
       msg: 'Local slides PDF and PPTX files are not available at path {{ bbb_lxc_local_slides_dir }}'
@@ -208,10 +241,12 @@
   - name: '{{ lxc_instance.name }}: Check if UFW is enabled'
     shell: "lxc exec {{ lxc_instance.name }} -- sh -c \"ufw status | grep 'Status: active'\""
 
+  - name: '{{ lxc_instance.name }}: Check correct bbb directory ownership'
+    command: "lxc exec {{ lxc_instance.name }} -- chown -R bigbluebutton:bigbluebutton /var/bigbluebutton"
+
   - set_fact:
-      bbb_lxc_will_restart: |-
-        {{ bbb_lxc_properties_changed_stat.changed or bbb_lxc_html5_changed_stat.changed
-        or bbb_lxc_apply_script_changed_stat.changed }}
+      bbb_lxc_will_restart: "{{ bbb_lxc_properties_changed_stat.changed or bbb_lxc_html5_changed_stat.changed
+          or bbb_lxc_apply_script_changed_stat.changed or bbb_lxc_freeswitch_changed_stat.changed }}"
 
   - import_tasks: restart_bbb.yml
     when: bbb_lxc_will_restart|bool

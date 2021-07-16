@@ -7,8 +7,12 @@ bbb_lxc_bbb_redirect_url:
 bbb_lxc_bbb_index_file: '/var/www/bigbluebutton-default/index.html'
 # Path to BBB properties file
 bbb_lxc_bbb_properties_file: '/usr/share/bbb-web/WEB-INF/classes/bigbluebutton.properties'
+# Path to Freeswitch configuration
+bbb_lxc_bbb_freeswitch_config_file: '/opt/freeswitch/etc/freeswitch/vars.xml'
+# Target systemd unit directory
+bbb_lxc_systemd_unit_dir: '/usr/lib/systemd/system'
 # Path to HTML5 systemd unit file
-bbb_lxc_bbb_html5unit_file: '/usr/lib/systemd/system/bbb-html5.service'
+bbb_lxc_bbb_html5unit_file: '{{ bbb_lxc_systemd_unit_dir }}/bbb-html5.service'
 # If true container will be configured for local network
 bbb_lxc_net_bridged: true
 # If true role will force BBB install script even if BBB has already been installed
