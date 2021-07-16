@@ -1,0 +1,5 @@
+---
+
+- name: '{{ lxc_instance.name }}: Stop BBB'
+  command:
+    cmd: 'lxc exec {{ lxc_instance.name }} -- bbb-conf --stop'

@@ -4,8 +4,8 @@
   command:
     cmd: 'lxc exec {{ lxc_instance.name }} -- apt-get {{ item }}'
   with_items:
-    - 'update'
-    - 'install apt-transport-https ca-certificates curl gnupg'
+    - 'update -y'
+    - 'install apt-transport-https ca-certificates curl gnupg -y --force-yes'
 
 - name: Install docker repository keyring
   shell: 'lxc exec {{ lxc_instance.name }} -- sh -c "{{ item }}"'

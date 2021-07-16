@@ -1,0 +1,12 @@
+---
+
+- name: Stop BBB instances
+  include_tasks: bbb/stop_bbb.yml
+  loop: '{{ bbb_lxc_instances }}'
+  when: lxc_instance.install_bbb|default(false)
+  loop_control:
+    loop_var: lxc_instance
+
+- name: Stop LXC instances
+  command: 'lxc stop {{ item.name }}'
+  with_items: '{{ bbb_lxc_instances }}'

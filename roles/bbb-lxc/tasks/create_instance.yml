@@ -13,7 +13,7 @@
   block:
     - name: '{{ lxc_instance.name }}: Creating LXC instance'
       command:
-        cmd: 'lxc launch {{ lxc_instance.image }} {{ lxc_instance.name }} -p {{ lxc_instance.profile }} -n {{ default_route_iface }}'
+        cmd: 'lxc launch {{ lxc_instance.lxc_image }} {{ lxc_instance.name }} -p {{ lxc_instance.profile }} -n {{ default_route_iface }}'
       when: exists_lxc_instance.rc != 0
 
     - name: '{{ lxc_instance.name }}: Configure nested security to LXC container'
@@ -27,6 +27,14 @@
       command: "lxc exec {{ lxc_instance.name }} -- sh -c 'echo -n \"{{ lxc_instance.hostname }}\" > /etc/hostname'"
       when: lxc_instance_host_stat.stdout|trim != lxc_instance.hostname
 
+    - name: Determine network driver
+      command: "lxc exec {{ lxc_instance.name }} -- ls /etc/netplan"
+      ignore_errors: true
+      register: stat_netplan
+
+    - set_fact:
+        netplan_exists: "{{ stat_netplan.rc == 0 }}"
+
     - name: '{{ lxc_instance.name }}: Copy network configuration template'
       template:
         src: "{{ item.template }}"
@@ -35,6 +43,8 @@
       with_items:
         - template: network-interface.cfg.j2
           dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_network.cfg"
+        - template: netplan-bbb-macvlan.yaml.j2
+          dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_network_netplan.yaml"
         - template: 99-disable-network-config.cfg.j2
           dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_99-disable-network-config.cfg"
         - template: bash_aliases.j2
@@ -44,14 +54,36 @@
       command:
         cmd: "lxc file push {{ item }}"
       with_items:
-        - '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_network.cfg {{ lxc_instance.name }}/etc/network/interfaces.d/50-bbb-macvlan.cfg'
         - '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_99-disable-network-config.cfg {{ lxc_instance.name }}/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg'
         - '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bash_aliases {{ lxc_instance.name }}/root/.bash_aliases'
 
+    - name: '{{ lxc_instance.name }}: Configure container network interface for older Ubuntu interfaced'
+      command:
+        cmd: "lxc file push {{ item }}"
+      with_items:
+        - '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_network.cfg {{ lxc_instance.name }}/etc/network/interfaces.d/50-bbb-macvlan.cfg'
+      when: not netplan_exists
+
+    - name: '{{ lxc_instance.name }}: Configure container network interface for Ubuntu netplan network'
+      command:
+        cmd: "lxc file push {{ item }}"
+      with_items:
+        - '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_network_netplan.yaml {{ lxc_instance.name }}/etc/netplan/10-bbb-macvlan.yaml'
+      when: netplan_exists
+      register: netplan_configured
+
     - name: '{{ lxc_instance.name }}: Remove container network cloud config'
       command:
-        cmd: 'lxc exec {{ lxc_instance.name }} rm /etc/network/interfaces.d/50-cloud-init.cfg'
+        cmd: 'lxc exec {{ lxc_instance.name }} rm {{ item }}'
+      with_items:
+        - '/etc/network/interfaces.d/50-cloud-init.cfg'
+        - '/etc/netplan/50-cloud-init.yaml'
       ignore_errors: true
+
+    - name: '{{ lxc_instance.name }}: Apply Ubuntu netplan network'
+      command:
+        cmd: "lxc exec {{ lxc_instance.name }} -- netplan apply"
+      when: netplan_configured.changed
 
     - name: '{{ lxc_instance.name }}: Restart container'
       command:
@@ -68,7 +100,7 @@
         cmd: "lxc exec {{ lxc_instance.name }} -- {{ item }}"
       with_items:
         - 'dpkg --configure -a'
-        - 'apt-get update'
+        - 'apt-get update -y'
         - 'apt-get upgrade -y --force-yes'
         - 'apt-get autoremove -y --force-yes'
       # apt tasks can have locks acquired from other processes, retry several times before giving up.

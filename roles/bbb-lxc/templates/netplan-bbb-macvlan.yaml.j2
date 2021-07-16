@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth0:
+      dhcp4: false
+      addresses:
+        - {{ lxc_instance.ip_address }}/24
+      gateway4: {{ lxc_instance.default_route }}
+      nameservers:
+        search: [{{ lxc_instance.hostname }}]
+        addresses: [{{ lxc_instance.dns_servers|join(', ') }}]

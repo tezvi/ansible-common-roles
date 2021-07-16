@@ -37,6 +37,14 @@
       command:
         cmd: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'
       with_items:
-        - 'chown -R bigbluebutton:bigbluebutton /var/bigbluebutton/'
+        - 'chown bigbluebutton:bigbluebutton /var/bigbluebutton'
+        - 'chown -R bigbluebutton:bigbluebutton /var/bigbluebutton/' # Follow symlink contents
+
+    - name: '{{ lxc_instance.name }}: Fix link target bbb-redmine dir permissions'
+      command:
+        cmd: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'
+      with_items:
         - 'chown -R red5:red5 /var/bigbluebutton/screenshare'
+      when: "{{ lxc_instance.bbb_version == 'xenial-22' }}"
+
   when: stat_lxc_instance_bbb_dir.results[2].rc == 0
