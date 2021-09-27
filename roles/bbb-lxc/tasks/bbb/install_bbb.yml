@@ -142,7 +142,7 @@
     register: bbb_lxc_freeswitch_changed_stat
     when: bbb_lxc_config_diff.results[1].rc != 0
 
-  - command: 'lxc exec {{ lxc_instance.name }} -- ls {{ bbb_lxc_bbb_index_file }}.orig'
+  - command: "lxc exec {{ lxc_instance.name }} -- grep '{{ bbb_lxc_bbb_redirect_url }}' {{ bbb_lxc_bbb_index_file }}"
     ignore_errors: true
     register: bbb_lxc_index_placeholder_stat
 
@@ -247,6 +247,18 @@
   - set_fact:
       bbb_lxc_will_restart: "{{ bbb_lxc_properties_changed_stat.changed or bbb_lxc_html5_changed_stat.changed
           or bbb_lxc_apply_script_changed_stat.changed or bbb_lxc_freeswitch_changed_stat.changed }}"
+
+  - name: '{{ lxc_instance.name }}: Check default http redirect'
+    command: "lxc exec {{ lxc_instance.name }} -- grep /etc/nginx/sites-enabled/default 'return 301 {{ bbb_lxc_bbb_redirect_url }};'"
+    ignore_errors: true
+    register: bbb_lxc_http_redirect_stat
+
+  - name: '{{ lxc_instance.name }}: Set default http redirect'
+    command: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'
+    with_items:
+      - "sh -c 'sed -i \"/server_name _;/ireturn 301 {{ bbb_lxc_bbb_redirect_url }};\" /etc/nginx/sites-enabled/default'"
+      - 'systemctl reload nginx'
+    when: bbb_lxc_http_redirect_stat.rc != 0
 
   - import_tasks: restart_bbb.yml
     when: bbb_lxc_will_restart|bool

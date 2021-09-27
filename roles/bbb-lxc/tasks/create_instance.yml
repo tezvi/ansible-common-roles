@@ -1,20 +1,39 @@
 ---
 
-- command:
-    cmd: 'lxc info {{ lxc_instance.name }}'
-  ignore_errors: true
-  register: exists_lxc_instance
-
 - fail:
     msg: Container instance name cannot be empty
   when: not lxc_instance.name|length
 
+- name: '{{ lxc_instance.name }}: Check container existance'
+  command:
+    cmd: 'lxc info {{ lxc_instance.name }}'
+  ignore_errors: true
+  register: exists_lxc_instance_stat
+
+- set_fact:
+   lxc_instance_exists: "{{ exists_lxc_instance_stat is defined and exists_lxc_instance_stat.rc == 0 }}"
+
+- name: '{{ lxc_instance.name }}: Check container status'
+  shell: 'lxc ls {{ lxc_instance.name }} | grep STOPPED'
+  ignore_errors: true
+  when: lxc_instance_exists
+  register: lxc_instance_status
+
+- set_fact:
+    lxc_instance_stopped: "{{ lxc_instance_status is defined and lxc_instance_status.rc|default(1) == 0 }}"
+
 - name: 'Create and provision LXC instance {{ lxc_instance.name }}'
   block:
+
+    - name: '{{ lxc_instance.name }}: Starting existing LXC instance'
+      command:
+        cmd: 'lxc start {{ lxc_instance.name }}'
+      when: lxc_instance_stopped
+
     - name: '{{ lxc_instance.name }}: Creating LXC instance'
       command:
         cmd: 'lxc launch {{ lxc_instance.lxc_image }} {{ lxc_instance.name }} -p {{ lxc_instance.profile }} -n {{ default_route_iface }}'
-      when: exists_lxc_instance.rc != 0
+      when: not lxc_instance_exists
 
     - name: '{{ lxc_instance.name }}: Configure nested security to LXC container'
       command: 'lxc config set {{ lxc_instance.name }} security.nesting true'
@@ -88,24 +107,33 @@
     - name: '{{ lxc_instance.name }}: Restart container'
       command:
         cmd: 'lxc restart {{ lxc_instance.name }}'
+      retries: 3
+      delay: 60
+      register: stat_restart_container
+      until: stat_restart_container is not failed
 
     - name: '{{ lxc_instance.name }}: Check internet connection'
       command:
         cmd: 'lxc exec {{ lxc_instance.name }} -- ping -c1 google.com'
       retries: 3
-      delay: 5
+      delay: 15
+      register: stat_container_internet
+      until: stat_container_internet is not failed
 
     - name: '{{ lxc_instance.name }}: Update installed apt packages and cache'
       command:
-        cmd: "lxc exec {{ lxc_instance.name }} -- {{ item }}"
+        cmd: "lxc exec {{ lxc_instance.name }} -- sh -c 'sleep 10 && {{ item }}'"
       with_items:
         - 'dpkg --configure -a'
         - 'apt-get update -y'
         - 'apt-get upgrade -y --force-yes'
         - 'apt-get autoremove -y --force-yes'
+      become: true
       # apt tasks can have locks acquired from other processes, retry several times before giving up.
       retries: 3
-      delay: 30
+      delay: 60
+      register: stat_apt_commands
+      until: stat_apt_commands is not failed
 
     - name: '{{ lxc_instance.name }}: Install default tools and utilities'
       command:
