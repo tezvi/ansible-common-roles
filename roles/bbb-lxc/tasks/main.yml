@@ -18,4 +18,3 @@
     loop_var: lxc_instance
 
 - include_tasks: install_bbb_instances.yml
-
