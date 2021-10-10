@@ -18,5 +18,5 @@
     return_content: yes
     status_code: 200
   register: response
-  become: none
+  become: no
   failed_when: "response.failed or 'SUCCESS' not in response.content"
