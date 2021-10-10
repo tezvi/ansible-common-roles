@@ -46,6 +46,9 @@
       command: "lxc exec {{ lxc_instance.name }} -- sh -c 'echo -n \"{{ lxc_instance.hostname }}\" > /etc/hostname'"
       when: lxc_instance_host_stat.stdout|trim != lxc_instance.hostname
 
+    - name: '{{ lxc_instance.name }}: Place LXC name tag'
+      shell: "lxc exec {{ lxc_instance.name }} -- sh -c \"echo '{{ lxc_instance.name }}' > /etc/lxc_tag\""
+
     - name: Determine network driver
       command: "lxc exec {{ lxc_instance.name }} -- ls /etc/netplan"
       ignore_errors: true
@@ -149,6 +152,19 @@
       when: "'git' in bbb_lxc_default_packages"
 
     - import_tasks:  install_docker.yml
+
+    - name: '{{ lxc_instance.name }}: Template shell LXC prompt script'
+      template:
+        src: shell-prompt-lxc.sh.j2
+        dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_shell-prompt-lxc.sh"
+        mode: 0644
+
+    - name: '{{ lxc_instance.name }}: Deploy shell LXC prompt script'
+      command:
+        cmd: 'lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_shell-prompt-lxc.sh {{ lxc_instance.name }}/etc/profile.d/shell-prompt-lxc.sh'
+
+    - name: '{{ lxc_instance.name }}: Enable shell LXC prompt script'
+      shell: "lxc exec {{ lxc_instance.name }} -- sh -c \"grep 'shell-prompt-lxc.sh' /root/.bashrc || echo 'source /etc/profile.d/shell-prompt-lxc.sh' >> /root/.bashrc\""
 
   always:
     - name: '{{ lxc_instance.name }}: Remove temporary container files'

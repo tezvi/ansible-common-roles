@@ -1,0 +1,27 @@
+# Bash prompt for LXC prompty detection
+#
+# Author: Andrej Vitez <contact@andrejvitez.com>
+#
+# Add this file to your homedir .bash_profile file or create a new one under
+# /etc/profile.d/lxc.sh
+#
+# This script will add LXC tag to your PS prompt to hint user that is using lxc container.
+
+# Skip all for noninteractive shells.
+[ ! -t 0 ] && return
+
+export CLICOLOR=1
+export LSCOLORS=Gxfxcxdxbxegedabagacad
+
+function get_lxc_env() {
+  LXC_TAG=$(cat /etc/lxc_tag)
+  if grep lxc /proc/1/environ &> /dev/null; then
+    if [[ ! -z "$LXC_TAG" ]]; then
+       LXC_TAG=":$LXC_TAG"
+    fi
+    echo -e "[lxc$LXC_TAG] "
+  fi
+}
+
+PSLINE='\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$'
+PS1="\$(get_lxc_env)$PSLINE "
