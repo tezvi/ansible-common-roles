@@ -50,6 +50,8 @@
           dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bbb-html5-backend@.service'
         - src: '{{ bbb_lxc_systemd_unit_dir }}/bbb-html5-frontend@.service'
           dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bbb-html5-frontend@.service'
+        - src: '/lib/systemd/system/freeswitch.service'
+          dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_freeswitch.service'
     when: lxc_instance.bbb_version == 'bionic-23'
 
   - name: '{{ lxc_instance.name }}: Copy BBB config files to host for provisioning'
@@ -92,12 +94,15 @@
     lineinfile:
       dest: "{{ item.0.dest }}"
       regexp: "{{ item.1.find }}"
-      line: "{{ item.1.replace }}"
+      line: "{{ item.1.replace }} # lxc defused"
       state: present
+      backrefs: yes
     with_nested:
       - "{{ bbb_template_files[2:] }}"
-      - [{find: 'CPUSchedulingPolicy=fifo',
-          replace: '#CPUSchedulingPolicy=fifo'}]
+      - [
+          {find: 'IOSchedulingClass=realtime', replace: '#IOSchedulingClass=realtime'},
+          {find: 'CPUSchedulingPolicy=(fifo|rr)', replace: '#CPUSchedulingPolicy=\1'}
+         ]
 
   - name: '{{ lxc_instance.name }}: Provision Freeswitch public ip'
     replace:
@@ -121,7 +126,7 @@
     register: bbb_lxc_properties_changed_stat
     when: bbb_lxc_config_diff.results[0].rc != 0
 
-  - name: '{{ lxc_instance.name }}: Push new BBB HTML5 systemd unit file'
+  - name: '{{ lxc_instance.name }}: Push new BBB HTML5 systemd unit files'
     command:
       cmd: "lxc {{ item.0 | replace('%FILE%', item.1.src) | replace('%SRC%', item.1.dest) }}"
     with_nested:
