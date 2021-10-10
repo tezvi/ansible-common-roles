@@ -1,13 +1,13 @@
 ---
 
-- name: Install apt packages
+- name: '{{ lxc_instance.name }}: Install apt packages'
   command:
     cmd: 'lxc exec {{ lxc_instance.name }} -- apt-get {{ item }}'
   with_items:
     - 'update -y'
     - 'install apt-transport-https ca-certificates curl gnupg -y --force-yes'
 
-- name: Install docker repository keyring
+- name: '{{ lxc_instance.name }}: Install docker repository keyring'
   shell: 'lxc exec {{ lxc_instance.name }} -- sh -c "{{ item }}"'
   with_items:
     - "rm /usr/share/keyrings/docker-archive-keyring.gpg || echo 'Docker keyring does not exist locally'"
@@ -18,13 +18,13 @@
   register: apt_docker_repo_exists
   ignore_errors: true
 
-- name: Install docker repository
+- name: '{{ lxc_instance.name }}: Install docker repository'
   shell: >-
     lxc exec {{ lxc_instance.name }} -- sh -c
     'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null'
   when: apt_docker_repo_exists.rc != 0
 
-- name: Install apt packages
+- name: '{{ lxc_instance.name }}: Install apt packages'
   command:
     cmd: 'lxc exec {{ lxc_instance.name }} -- apt-get {{ item }}'
   with_items:
@@ -36,7 +36,7 @@
   register: bbb_scalelite_docker_composer_exists
   ignore_errors: true
 
-- name: Install docker compose
+- name: '{{ lxc_instance.name }}: Install docker compose'
   command:
     cmd: "lxc exec {{ lxc_instance.name }} -- sh -c '{{ item }}'"
   with_items:
