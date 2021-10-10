@@ -273,6 +273,10 @@ bbb_lxc_bbb_redirect_url:
 bbb_lxc_bbb_index_file: '/var/www/bigbluebutton-default/index.html'
 # Path to BBB properties file
 bbb_lxc_bbb_properties_file: '/usr/share/bbb-web/WEB-INF/classes/bigbluebutton.properties'
+# Path to Freeswitch configuration
+bbb_lxc_bbb_freeswitch_config_file: '/opt/freeswitch/etc/freeswitch/vars.xml'
+# Target systemd unit directory
+bbb_lxc_systemd_unit_dir: '/usr/lib/systemd/system'
 # Path to HTML5 systemd unit file
 bbb_lxc_bbb_html5unit_file: '/usr/lib/systemd/system/bbb-html5.service'
 # If true container will be configured for local network
@@ -327,6 +331,37 @@ bbb_lxc_instances: []
 #    dns_servers:
 #    profile:
 #    image:
+```
+
+### BigBlueButton Scalelite (bbb-lxc-scalelite)
+Installs and configures Scalelite to a specific LXC container. Each BBB instance can be automatically registered to load balancer and configured for distributed sharing of each BigBlueButton published recordings.
+
+Available variables:
+
+```yaml
+---
+bbb_scalelite_lxc:
+  #  name:
+  #  hostname:
+  #  email:
+  #  recording_poll: true # Enable polling of new recordings
+  members: []
+  # members:
+  #  - hostname: example.com
+  #    lxc: lxcname # used if ansible controller has direct access to LXC host to automatically inspect for BBB secret
+  #    multiplier: 0.5 # defaults to bbb_scalelite_lxc.default_multiplier
+  #    secret: examplehash # refers to BBB API secret
+
+bbb_scalelite_default_multiplier: '1.0'
+bbb_scalelite_dir: '/opt/scalelite-run'
+bbb_scalelite_git_repo: 'https://github.com/tezvi/scalelite-run.git'
+bbb_scalelite_shared: '/opt/bbbshared'
+bbb_scalelite_recordings: '{{ bbb_scalelite_shared }}/scalelite-recordings'
+bbb_scalelite_recordings_spool: '{{ bbb_scalelite_recordings }}/spool'
+bbb_scalelite_spool_gid: 998
+bbb_scalelite_tmp_dir: /tmp
+bbb_scalelite_recordings_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_post_publish.rb'
+bbb_scalelite_recordings_prune_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_prune_recordings.sh'
 ```
     
 ### Wkhtml

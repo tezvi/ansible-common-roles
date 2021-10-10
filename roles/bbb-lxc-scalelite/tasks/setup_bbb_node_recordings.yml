@@ -1,0 +1,44 @@
+---
+
+- name: '{{ lxc_instance.name }}: Create symlink to shared dir'
+  command: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'
+  with_items:
+    - 'ln -nsf {{ bbb_scalelite_recordings_spool }} /var/bigbluebutton/spool'
+
+- name: '{{ lxc_instance.name }}: Check if spool directory is writable'
+  command: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'
+  with_items:
+    - "sudo -u '#1000' touch /var/bigbluebutton/spool/test_{{ lxc_instance.name }}"
+    - "rm /var/bigbluebutton/spool/test_{{ lxc_instance.name }}"
+
+- block:
+    - name: '{{ lxc_instance.name }}: Copy scalelite recording script config'
+      template:
+        src: scalelite-recording-hook-config.yml.j2
+        dest: "{{ bbb_scalelite_tmp_dir }}/{{ lxc_instance.name }}_scalelite-recording-hook-config.yml"
+        mode: 0644
+
+    - name: '{{ lxc_instance.name }}: Download ruby recordings script'
+      get_url:
+        url: "{{ bbb_scalelite_recordings_script_url }}"
+        dest: "{{ bbb_scalelite_tmp_dir }}/{{ lxc_instance.name }}_post_publish_scalelite.rb"
+
+    - name: '{{ lxc_instance.name }}: Download prune recordings script'
+      get_url:
+        url: "{{ bbb_scalelite_recordings_prune_script_url }}"
+        dest: "{{ bbb_scalelite_tmp_dir }}/{{ lxc_instance.name }}_scalelite_prune_recordings.sh"
+
+    - name: '{{ lxc_instance.name }}: Push scalelite recording script config to {{ lxc_instance.name }}'
+      command: 'lxc file push {{ bbb_scalelite_tmp_dir }}/{{ lxc_instance.name }}_{{ item }}'
+      with_items:
+        - 'scalelite-recording-hook-config.yml {{ lxc_instance.name }}/usr/local/bigbluebutton/core/scripts/scalelite.yml'
+        - 'post_publish_scalelite.rb {{ lxc_instance.name }}/usr/local/bigbluebutton/core/scripts/post_publish/post_publish_scalelite.rb'
+        - 'scalelite_prune_recordings.sh {{ lxc_instance.name }}/etc/cron.daily/scalelite_prune_recordings'
+
+    - name: '{{ lxc_instance.name }}: Configure executable mode for prune recordings script'
+      command: 'lxc exec {{ lxc_instance.name }} -- chmod 755 /etc/cron.daily/scalelite_prune_recordings'
+
+  always:
+    - name: '{{ lxc_instance.name }}: Remove temporary container files'
+      shell: 'rm {{ bbb_scalelite_tmp_dir }}/{{ lxc_instance.name }}_*'
+      ignore_errors: true

@@ -1,0 +1,11 @@
+#!/bin/bash
+# {{ ansible_managed }}
+
+STATS="$(docker exec -i scalelite-api bundle exec rake status | sed -E -e 's/[[:blank:]]+/|/g' | tail -n +2 | grep online)"
+MEETINGS=$(echo "$STATS" | cut -f5 -d "|" | grep -v '^$' | paste -sd+ | bc)
+USERS=$(echo "$STATS" | cut -f6 -d "|" | grep -v '^$' | paste -sd+ | bc)
+VIDEOS=$(echo "$STATS" | cut -f8 -d "|" | grep -v '^$' | paste -sd+ | bc)
+
+echo "Meetings: $MEETINGS"
+echo "Videos: $VIDEOS"
+echo "Users: $USERS"

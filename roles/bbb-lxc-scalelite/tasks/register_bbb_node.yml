@@ -1,0 +1,72 @@
+---
+
+- name: '[{{ bbb_node.hostname }}]: Register BBB instance to Scalelite'
+  block:
+    - set_fact:
+        bbb_instance_secret: "{{ bbb_node.secret|default('') }}"
+        bbb_instance_url: 'https://{{ bbb_node.hostname }}/bigbluebutton/api/'
+
+    - command: 'lxc exec {{ bbb_node.lxc }} -- bbb-conf --status'
+      register: bbb_instance_installed_stat
+      when: bbb_node.lxc is defined and bbb_node.lxc|length
+
+    - command: 'lxc exec {{ bbb_node.lxc }} -- sh -c "bbb-conf --secret | grep Secret: | cut -d: -f2"'
+      when: bbb_instance_installed_stat.rc is defined and bbb_instance_installed_stat.rc == 0
+      register: bbb_instance_secret_stat
+
+    - set_fact:
+        bbb_instance_secret: '{{ bbb_instance_secret_stat.stdout|trim }}'
+      when: bbb_instance_secret_stat is defined and bbb_instance_secret_stat.stdout|default('')
+
+    - fail:
+        msg: |
+          Unable to determine BBB node {{ bbb_node.hostname }} API secret [lxc: {{ bbb_node.lxc|default('-') }},
+           secret: {{ 'defined' if bbb_node.secret|default() else 'empty' }}]
+      when: not bbb_instance_secret
+
+    - name: '[{{ bbb_node.hostname }}]: Check Scalelite server entry'
+      command: >-
+        lxc exec {{ bbb_scalelite_lxc.name }} --
+        sh -c "docker exec -i scalelite-api bundle exec rake servers | grep -A 5 -B 1 {{ bbb_instance_url }}"
+      register: scalelite_entry_check
+      ignore_errors: true
+
+    - set_fact:
+        scalelite_entry_info: "{{ scalelite_entry_check.stdout|trim if scalelite_entry_check.stdout is defined else '' }}"
+    - set_fact:
+        scalelite_entry_id: "{{ scalelite_entry_info | regex_search('id:\\s*([a-z0-9\\-]+)') | replace('id:', '') | trim }}"
+
+    - name: '[{{ bbb_node.hostname }}]: Remove server entry if secret differs'
+      command: >-
+        lxc exec {{ bbb_scalelite_lxc.name }} --
+        sh -c "docker exec -i scalelite-api bundle exec rake servers:remove[{{ scalelite_entry_id }}]"
+      register: scalelite_entry_removed
+      when: >-
+        scalelite_entry_check.rc == 0 and not bbb_instance_secret in scalelite_entry_info and scalelite_entry_id
+
+    - name: '[{{ bbb_node.hostname }}]: Add Scalelite server entry'
+      command: >-
+        lxc exec {{ bbb_scalelite_lxc.name }} --
+        sh -c "docker exec -i scalelite-api bundle exec rake servers:add[{{ bbb_instance_url }},{{ bbb_instance_secret }},{{ bbb_node.multiplier|default(bbb_scalelite_default_multiplier )}}]"
+      when: scalelite_entry_check.rc != 0 or (scalelite_entry_removed.rc is defined and scalelite_entry_removed.rc == 0)
+      register: scalelite_add_entry
+
+    - set_fact:
+        scalelite_entry_id: "{{ scalelite_add_entry.stdout | regex_search('id:\\s*([a-z0-9\\-]+)') | replace('id:', '') | trim }}"
+      when: scalelite_add_entry.rc is defined and scalelite_add_entry.rc == 0
+
+    - fail:
+        msg: 'Unable to determine {{ bbb_node.hostname }} scalelite ID'
+      when: not scalelite_entry_id
+
+    - name: '[{{ bbb_node.hostname }}]: Enable Scalelite server entry'
+      command: >-
+        lxc exec {{ bbb_scalelite_lxc.name }} --
+        sh -c "docker exec -i scalelite-api bundle exec rake servers:enable[{{ scalelite_entry_id }}]"
+      when: >-
+        scalelite_entry_id and ((scalelite_add_entry.rc is defined and scalelite_add_entry.rc == 0)
+          or 'disabled' in scalelite_entry_info)
+
+  rescue:
+    - fail:
+        msg: 'Unable to register BBB node {{ bbb_node.hostname }} to Scalelite instance'

@@ -1,0 +1,9 @@
+---
+
+- include_tasks: install.yml
+
+- include_tasks: configure.yml
+
+- include_tasks: register_bbb_members.yml
+
+- include_tasks: configure_recordings.yml
