@@ -1,0 +1,7 @@
+---
+
+- name: Register BBB instances
+  include_tasks: register_bbb_node.yml
+  loop: '{{ bbb_scalelite_lxc.members }}'
+  loop_control:
+    loop_var: bbb_node

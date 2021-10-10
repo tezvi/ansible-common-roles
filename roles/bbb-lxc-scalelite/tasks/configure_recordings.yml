@@ -1,0 +1,41 @@
+---
+
+- name: Configure scalelite for recordings
+  block:
+    - command: "lxc exec {{ bbb_scalelite_lxc.name }} -- ls {{ bbb_scalelite_shared }}"
+      register: stat_bbb_shared_dir
+      ignore_errors: true
+
+    - fail:
+        msg: 'Shared directory "{{ bbb_scalelite_shared }}" is not available on node'
+      when: stat_bbb_shared_dir.rc != 0
+
+    - name: Create shared recording directory
+      command: 'lxc exec {{ bbb_scalelite_lxc.name }} -- {{ item }}'
+      with_items:
+        - 'mkdir -p {{ bbb_scalelite_recordings }}'
+        - 'mkdir -p {{ bbb_scalelite_recordings_spool }}'
+        - 'mkdir -p {{ bbb_scalelite_recordings }}/recording/scalelite'
+        - 'mkdir -p {{ bbb_scalelite_recordings }}/published'
+        - 'mkdir -p {{ bbb_scalelite_recordings }}/unpublished'
+        - 'chown -R 1000:{{ bbb_scalelite_spool_gid }} {{ bbb_scalelite_recordings }}'
+        - 'chmod -R g+rw {{ bbb_scalelite_recordings }}'
+
+    - name: Restart Scalelite Docker containers
+      command:
+        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "cd {{ bbb_scalelite_dir }}; docker-compose stop; docker-compose up -d"'
+
+    - name: Check if spool directory is writable by docker image
+      command: "lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c '{{ item }}'"
+      with_items:
+        - "docker exec scalelite-recording-importer touch /var/bigbluebutton/spool/test_{{ bbb_scalelite_lxc.name }}"
+        - "docker exec scalelite-recording-importer rm /var/bigbluebutton/spool/test_{{ bbb_scalelite_lxc.name }}"
+
+    - name: Setup shared recordings for BBB instances
+      include_tasks: setup_bbb_node_recordings.yml
+      loop: '{{ bbb_lxc_instances }}'
+      when: bbb_lxc_instances is defined and lxc_instance.install_bbb
+      loop_control:
+        loop_var: lxc_instance
+
+  when: bbb_scalelite_recordings_spool|length

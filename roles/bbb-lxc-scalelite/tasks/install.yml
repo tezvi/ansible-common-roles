@@ -1,0 +1,25 @@
+---
+
+- name: Install docker to scalelite LXC instance
+  include_role:
+    name: bbb-lxc
+    tasks_from: install_docker
+  vars:
+    lxc_instance: '{{ bbb_scalelite_lxc }}'
+
+- command:
+    cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- ls {{ bbb_scalelite_dir }}'
+  register: bbb_scalelite_run_exists
+  ignore_errors: true
+
+- name: Clone scalelite compose GIT package
+  command:
+    cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- git clone {{ bbb_scalelite_git_repo }} {{ bbb_scalelite_dir }}'
+  when: bbb_scalelite_run_exists.rc != 0
+
+- name: Configure Scalelite container UFW firewall
+  command: 'lxc exec {{ bbb_scalelite_lxc.name }} -- ufw {{ item }}'
+  with_items:
+    - 'allow http'
+    - 'allow https'
+    - 'enable'

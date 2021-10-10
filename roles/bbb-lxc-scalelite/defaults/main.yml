@@ -1,0 +1,23 @@
+---
+bbb_scalelite_lxc:
+#  name:
+#  hostname:
+#  email:
+#  recording_poll: true # Enable polling of new recordings
+  members: []
+  # members:
+  #  - hostname: example.com
+  #    lxc: lxcname # used if ansible controller has direct access to LXC host to automatically inspect for BBB secret
+  #    multiplier: 0.5 # defaults to bbb_scalelite_lxc.default_multiplier
+  #    secret: examplehash # refers to BBB API secret
+
+bbb_scalelite_default_multiplier: '1.0'
+bbb_scalelite_dir: '/opt/scalelite-run'
+bbb_scalelite_git_repo: 'https://github.com/tezvi/scalelite-run.git'
+bbb_scalelite_shared: '/opt/bbbshared'
+bbb_scalelite_recordings: '{{ bbb_scalelite_shared }}/scalelite-recordings'
+bbb_scalelite_recordings_spool: '{{ bbb_scalelite_recordings }}/spool'
+bbb_scalelite_spool_gid: 998
+bbb_scalelite_tmp_dir: /tmp
+bbb_scalelite_recordings_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_post_publish.rb'
+bbb_scalelite_recordings_prune_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_prune_recordings.sh'
