@@ -1,15 +1,15 @@
 ---
 
-- command: 'lxc network show {{ bbb_lxd_bridged_network }}'
+- command: 'lxc network show {{ bbb_lxc_bridged_network }}'
   register: stat_lxd_bridged_network
   ignore_errors: true
 
-- name: Create internal bridged network {{ bbb_lxd_bridged_network }}
-  command: 'lxc network create {{ bbb_lxd_bridged_network }}'
+- name: Create internal bridged network {{ bbb_lxc_bridged_network }}
+  command: 'lxc network create {{ bbb_lxc_bridged_network }}'
   when: stat_lxd_bridged_network.rc != 0
 
-- name: Configure internal bridged network {{ bbb_lxd_bridged_network }}
-  command: 'lxc network set {{ bbb_lxd_bridged_network }} "{{ item }}"'
+- name: Configure internal bridged network {{ bbb_lxc_bridged_network }}
+  command: 'lxc network set {{ bbb_lxc_bridged_network }} "{{ item }}"'
   with_items:
     - "ipv4.dhcp=true"
     - "ipv4.firewall=false"
@@ -19,12 +19,12 @@
     - "ipv6.dhcp=false"
     - "ipv6.nat=false"
 
-- shell: 'lxc profile device show {{ bbb_lxd_profile }} | grep {{ bbb_lxd_bridged_network }}'
+- shell: 'lxc profile device show {{ bbb_lxc_profile }} | grep {{ bbb_lxc_bridged_network }}'
   register: stat_lxd_profile_network
   ignore_errors: true
 
-- name: Add internal bridged network to {{ bbb_lxd_profile }} profile
+- name: Add internal bridged network to {{ bbb_lxc_profile }} profile
   command: '{{ item }}'
   with_items:
-    - 'lxc profile device add {{ bbb_lxd_profile }} eth2 nic nictype=bridged name=eth2 parent={{ bbb_lxd_bridged_network }}'
+    - 'lxc profile device add {{ bbb_lxc_profile }} eth2 nic nictype=bridged name=eth2 parent={{ bbb_lxc_bridged_network }}'
   when: stat_lxd_profile_network.rc != 0

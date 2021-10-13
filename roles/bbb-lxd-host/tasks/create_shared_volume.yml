@@ -2,39 +2,39 @@
 
 - name: Check if LXD host has storage volume directory
   stat:
-    path: '{{ bbb_lxd_storage_pool_dir }}'
+    path: '{{ bbb_lxc_storage_pool_dir }}'
   register: stat_lxd_volume_dir
-  when: bbb_lxd_storage_pool_dir|length > 0
+  when: bbb_lxc_storage_pool_dir|length > 0
   failed_when: not stat_lxd_volume_dir.stat.exists
 
-- command: 'lxc storage show {{ bbb_lxd_storage_pool }}'
+- command: 'lxc storage show {{ bbb_lxc_storage_pool }}'
   register: stat_lxd_storage_bbbshared
   ignore_errors: true
 
-- command: 'lxc storage volume show {{ bbb_lxd_storage_pool }} bbbshared'
+- command: 'lxc storage volume show {{ bbb_lxc_storage_pool }} bbbshared'
   register: stat_lxd_volume_bbbshared
   ignore_errors: true
 
-- name: Create BBB shared storage {{ bbb_lxd_storage_pool }} for {{ bbb_lxd_profile }}
-  command: 'lxc storage create {{ bbb_lxd_storage_pool }} dir source={{ bbb_lxd_storage_pool_dir }}'
+- name: Create BBB shared storage {{ bbb_lxc_storage_pool }} for {{ bbb_lxc_profile }}
+  command: 'lxc storage create {{ bbb_lxc_storage_pool }} dir source={{ bbb_lxc_storage_pool_dir }}'
   when: stat_lxd_storage_bbbshared.rc != 0 and stat_lxd_volume_dir.stat.exists
 
-- name: Create BBB shared storage volume for {{ bbb_lxd_profile }}
-  command: 'lxc storage volume create {{ bbb_lxd_storage_pool }} bbbshared'
+- name: Create BBB shared storage volume for {{ bbb_lxc_profile }}
+  command: 'lxc storage volume create {{ bbb_lxc_storage_pool }} bbbshared'
   when: stat_lxd_volume_bbbshared.rc != 0
 
-- shell: 'lxc profile device show {{ bbb_lxd_profile }} | grep bbbshared'
+- shell: 'lxc profile device show {{ bbb_lxc_profile }} | grep bbbshared'
   register: stat_lxd_profile_bbbshared
   ignore_errors: true
 
-- name: Add BBB shared storage to {{ bbb_lxd_profile }} profile
+- name: Add BBB shared storage to {{ bbb_lxc_profile }} profile
   command:
-    cmd: 'lxc profile device add {{ bbb_lxd_profile }} bbbshared disk source=bbbshared path={{ bbb_lxd_storage_shared }} pool={{ bbb_lxd_storage_pool }}'
+    cmd: 'lxc profile device add {{ bbb_lxc_profile }} bbbshared disk source=bbbshared path={{ bbb_lxc_storage_shared }} pool={{ bbb_lxc_storage_pool }}'
   when: stat_lxd_profile_bbbshared.rc != 0
 
 - name: Create symlink to lxc container fs
   file:
-    src: '/var/snap/lxd/common/lxd/storage-pools/{{ bbb_lxd_storage_pool_default }}/containers'
+    src: '/var/snap/lxd/common/lxd/storage-pools/{{ bbb_lxc_storage_pool_default }}/containers'
     dest: /root/lxc-containers-fs
     force: true
     state: link
