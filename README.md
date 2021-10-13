@@ -234,28 +234,28 @@ Available variables:
 
 ```yaml
 # Install these extra yum packages
-bbb_lxd_host_packages:
+bbb_lxc_host_packages:
 - lxc-templates
 - lxc-utils
 - net-tools
 
 # This is the name of LXC profile that should be used for all BBB LXC instances
-bbb_lxd_profile: bbb_macvlan
+bbb_lxc_profile: bbb_macvlan
 
 # Mount point for extra LXC storage volume mounted within the container. If empty storage volume will not be created.
-bbb_lxd_storage_shared: /opt/bbbshared
+bbb_lxc_storage_shared: /opt/bbbshared
 
 # The name of local network used for communication between containers directly. If empty network will not be created.
-bbb_lxd_bridged_network: ''
+bbb_lxc_bridged_network: ''
 
 # Default profile storage pool name for directory root.
-bbb_lxd_storage_pool_default: default
+bbb_lxc_storage_pool_default: default
 
 # Storage pool name used for storage volume for BigBlueButton files
-bbb_lxd_storage_pool: bigbluebutton
+bbb_lxc_storage_pool: bigbluebutton
 
 # Host OS path where LXC storage pool is created. Leave empty and role will not create new storage pool.
-bbb_lxd_storage_pool_dir: ''
+bbb_lxc_storage_pool_dir: ''
 ```        
 
 ### BigBlueButton LXC instance (bbb-lxc)
@@ -302,6 +302,11 @@ bbb_lxc_local_slides:
   - 'default.pptx'
   - 'default.pdf'
 
+# Defines a hostname for turn/turns server
+bbb_lxc_turn_server:
+# Turn/turns server secret
+bbb_lxc_turn_secret:
+  
 # List of default yum packages to install on BBB LXC instance
 bbb_lxc_default_packages:
   - vim

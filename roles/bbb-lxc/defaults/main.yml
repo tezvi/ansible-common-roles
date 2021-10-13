@@ -36,6 +36,13 @@ bbb_lxc_local_slides:
   - 'default.pptx'
   - 'default.pdf'
 
+# Defines a hostname for turn/turns server
+bbb_lxc_turn_server:
+# Turn/turns server secret
+bbb_lxc_turn_secret:
+# Path to BBB stun-turn configuration file
+bbb_lxc_turn_config_file: /usr/share/bbb-web/WEB-INF/classes/spring/turn-stun-servers.xml
+
 # List of default yum packages to install on BBB LXC instance
 bbb_lxc_default_packages:
   - vim
