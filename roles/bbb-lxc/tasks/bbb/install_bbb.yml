@@ -120,7 +120,7 @@
     command:
       cmd: "lxc {{ item.0 | replace('%FILE%', item.1.src) | replace('%SRC%', item.1.dest) }}"
     with_nested:
-      - ['exec {{ lxc_instance.name }} -- cp -f %FILE% %FILE%.bak',
+      - ['exec {{ lxc_instance.name }} -- cp -f %FILE% %FILE%.bak-{{ ansible_date_time.epoch }}',
           'file push %SRC% {{ lxc_instance.name }}%FILE%']
       - "{{ bbb_template_files[0:0] }}"
     register: bbb_lxc_properties_changed_stat
@@ -130,7 +130,7 @@
     command:
       cmd: "lxc {{ item.0 | replace('%FILE%', item.1.src) | replace('%SRC%', item.1.dest) }}"
     with_nested:
-      - ['exec {{ lxc_instance.name }} -- cp -f %FILE% %FILE%.bak',
+      - ['exec {{ lxc_instance.name }} -- cp -f %FILE% %FILE%.bak-{{ ansible_date_time.epoch }}',
          'file push %SRC% {{ lxc_instance.name }}%FILE%',
          'exec {{ lxc_instance.name }} -- systemctl daemon-reload']
       - "{{ bbb_template_files[2:] }}"
@@ -141,7 +141,7 @@
     command:
       cmd: "lxc {{ item.0 | replace('%FILE%', item.1.src) | replace('%SRC%', item.1.dest) }}"
     with_nested:
-      - ['exec {{ lxc_instance.name }} -- cp -f %FILE% %FILE%.bak',
+      - ['exec {{ lxc_instance.name }} -- cp -f %FILE% %FILE%.bak-{{ ansible_date_time.epoch }}',
          'file push %SRC% {{ lxc_instance.name }}%FILE%']
       - "{{ bbb_template_files[1:2] }}"
     register: bbb_lxc_freeswitch_changed_stat
@@ -243,6 +243,21 @@
       with_items: '{{ bbb_lxc_local_slides }}'
     when: bbb_lxc_slides_available|bool
 
+  # configure turn server support
+  - name: '{{ lxc_instance.name }}: Render turn server configuration xml'
+    template:
+      src: bbb/turn-stun-servers.xml.j2
+      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_turn-stun-servers.xml"
+    when: bbb_lxc_turn_server
+
+  - name: 'Configure stun/turn server'
+    command: 'lxc {{ item }}'
+    with_items:
+      - exec {{ lxc_instance.name }} -- cp {{ bbb_lxc_turn_config_file }} {{ bbb_lxc_turn_config_file }}.bak-{{ ansible_date_time.epoch }}
+      - file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_turn-stun-servers.xml {{ lxc_instance.name }}{{ bbb_lxc_turn_config_file }}
+    when: bbb_lxc_turn_server
+    register: bbb_lxc_turn_configured_stat
+
   - name: '{{ lxc_instance.name }}: Check if UFW is enabled'
     shell: "lxc exec {{ lxc_instance.name }} -- sh -c \"ufw status | grep 'Status: active'\""
 
@@ -251,10 +266,11 @@
 
   - set_fact:
       bbb_lxc_will_restart: "{{ bbb_lxc_properties_changed_stat.changed or bbb_lxc_html5_changed_stat.changed
-          or bbb_lxc_apply_script_changed_stat.changed or bbb_lxc_freeswitch_changed_stat.changed }}"
+          or bbb_lxc_apply_script_changed_stat.changed or bbb_lxc_freeswitch_changed_stat.changed
+           or bbb_lxc_turn_configured_stat.changed }}"
 
   - name: '{{ lxc_instance.name }}: Check default http redirect'
-    command: "lxc exec {{ lxc_instance.name }} -- grep /etc/nginx/sites-enabled/default 'return 301 {{ bbb_lxc_bbb_redirect_url }};'"
+    command: "lxc exec {{ lxc_instance.name }} -- grep 'return 301 {{ bbb_lxc_bbb_redirect_url }};' /etc/nginx/sites-enabled/default"
     ignore_errors: true
     register: bbb_lxc_http_redirect_stat
 
