@@ -1,0 +1,65 @@
+---
+
+- name: "Update installed apt packages and cache"
+  command:
+    cmd: "lxc exec {{ bbb_lxc_coturn.name }} -- sh -c 'sleep 5 && {{ item }}'"
+  with_items:
+    - 'dpkg --configure -a'
+#    - 'add-apt-repository ppa:certbot/certbot'
+    - 'apt-get update -y'
+    - 'apt-get upgrade -y --force-yes'
+    - 'apt-get autoremove -y --force-yes'
+  become: true
+  # apt tasks can have locks acquired from other processes, retry several times before giving up.
+  retries: 3
+  delay: 60
+  register: stat_apt_commands
+  until: stat_apt_commands is not failed
+
+- name: "Install COTURN server to existing LXC container"
+  command:
+    cmd: "lxc exec {{ bbb_lxc_coturn.name }} -- apt-get install {{ item }} -y --force-yes"
+  with_items:
+    - coturn
+    - certbot
+
+- name: "Configure container UFW firewall"
+  command: 'lxc exec {{ bbb_lxc_coturn.name }} -- ufw {{ item }}'
+  with_items:
+    - 'allow proto tcp from any to any port 3478'
+    - 'allow proto udp from any to any port 3478'
+    - 'allow proto udp from any to any port 443'
+    - 'allow http'
+    - 'allow https'
+    - 'allow proto udp from any to any port 32769:65535'
+    - 'enable'
+
+- name: "Configure COTURN certbot"
+  block:
+    - name: "Configure coturn certbot"
+      command: >-
+        lxc exec {{ bbb_lxc_coturn.name }} -- certbot -n certonly --agree-tos --standalone --preferred-challenges http
+          -d {{ bbb_lxc_coturn.hostname }} --email {{ bbb_lxc_coturn.email }}
+
+
+    - name: "Create certbot coturn config directory"
+      command: "lxc exec {{ bbb_lxc_coturn.name }} -- mkdir -p /etc/letsencrypt/renewal-hooks/deploy"
+
+    - name: 'Render coturn certbot deploy config file'
+      template:
+        src: certbot.coturn.sh.j2
+        dest: "{{ bbb_lxc_coturn_tmp_dir }}/{{ bbb_lxc_coturn.name }}_certbot.coturn"
+        mode: 0644
+
+    - name: 'Install certbot coturn deploy file'
+      command:
+        cmd: 'lxc {{ item }}'
+      with_items:
+        - "exec {{ bbb_lxc_coturn.name }} -- sh -c 'mkdir -p /etc/letsencrypt/renewal-hooks/deploy || echo \"Dir already exists\"'"
+        - 'file push {{ bbb_lxc_coturn_tmp_dir }}/{{ bbb_lxc_coturn.name }}_certbot.coturn {{ bbb_lxc_coturn.name }}{{ bbb_lxc_coturn_certbot_deploy }}'
+        - "exec {{ bbb_lxc_coturn.name }} -- sh -c 'chmod 0755 {{ bbb_lxc_coturn_certbot_deploy }}'"
+
+  always:
+    - name: 'Remove temporary container files'
+      shell: 'rm {{ bbb_lxc_coturn_tmp_dir }}/coturn_*'
+      ignore_errors: true

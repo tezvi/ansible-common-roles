@@ -1,0 +1,73 @@
+---
+
+- name: Configure coturn server
+  block:
+      - set_fact:
+          bbb_lxc_coturn_config_tmp: '{{ bbb_lxc_coturn_tmp_dir }}/coturn_turnserver.conf'
+
+      - name: 'Render coturn configuration file'
+        template:
+          src: turnserver.conf.j2
+          dest: "{{ bbb_lxc_coturn_config_tmp }}"
+
+      - name: 'Copy coturn config file to host for provisioning'
+        command:
+          cmd: 'lxc file pull {{ bbb_lxc_coturn.name }}{{ bbb_lxc_coturn_config_file }} {{ bbb_lxc_coturn_tmp_dir }}.orig'
+
+      - command:
+          cmd: 'diff {{ bbb_lxc_coturn_config_tmp }} {{ bbb_lxc_coturn_config_tmp }}.orig'
+        register: bbb_lxc_coturn_config_diff
+        ignore_errors: true
+
+      - name: 'Deploy new coturn config file'
+        command: 'lxc {{ item }}'
+        with_items:
+          - 'exec {{ bbb_lxc_coturn.name }} -- cp {{ bbb_lxc_coturn_config_file }} {{ bbb_lxc_coturn_config_file }}.bak-{{ ansible_date_time.epoch }}'
+          - 'file push {{ bbb_lxc_coturn_config_tmp }} {{ bbb_lxc_coturn.name }}/{{ bbb_lxc_coturn_config_file }}'
+        when: bbb_lxc_coturn_config_diff.rc != 0
+
+      - name: 'Detect DHP file'
+        command: 'lxc exec {{ bbb_lxc_coturn.name }} -- ls {{ bbb_lxc_coturn_dhp_file }}'
+        ignore_errors: true
+        register: bbb_lxc_coturn_dhp_stat
+
+      - name: 'Generate new DHP file'
+        command: 'lxc exec {{ bbb_lxc_coturn.name }} -- {{ item }}'
+        with_items:
+          - 'mkdir -p {{ bbb_lxc_coturn_etc_dir }}'
+          - 'openssl dhparam -dsaparam  -out {{ bbb_lxc_coturn_dhp_file }} 2048'
+
+      - name: 'Render coturn systemd override file'
+        template:
+          src: systemd_override.j2
+          dest: "{{ bbb_lxc_coturn_tmp_dir }}/coturn_systemd_override.conf"
+
+      - name: 'Generate and deploy new DHP file'
+        command: 'lxc {{ item }}'
+        with_items:
+          - 'exec {{ bbb_lxc_coturn.name }} -- mkdir -p {{ bbb_lxc_coturn_systemd_dir }}'
+          - 'file push {{ bbb_lxc_coturn_tmp_dir }}/coturn_systemd_override.conf {{ bbb_lxc_coturn.name }}/{{ bbb_lxc_coturn_systemd_dir }}/override.conf'
+
+      - name: 'Render coturn logrorate config file'
+        template:
+          src: logrotate.conf.j2
+          dest: "{{ bbb_lxc_coturn_tmp_dir }}/coturn_logrotate.conf"
+
+      - name: 'Deploy logrotate config file'
+        command: 'lxc {{ item }}'
+        with_items:
+          - 'exec {{ bbb_lxc_coturn.name }} -- mkdir -p /var/log/turnserver'
+          - 'exec {{ bbb_lxc_coturn.name }} -- chown -R turnserver:turnserver /var/log/turnserver'
+          - 'file push {{ bbb_lxc_coturn_tmp_dir }}/coturn_logrotate.conf {{ bbb_lxc_coturn.name }}/etc/logrotate.d/coturn'
+
+      - name: 'Restart coturn server'
+        command: 'lxc exec {{ bbb_lxc_coturn.name }} --  {{ item }}'
+        with_items:
+          - 'bash /etc/letsencrypt/renewal-hooks/deploy/coturn' # Initial copy of certificates
+          - 'systemctl daemon-reload' # Ensure the override file is loaded
+          - 'systemctl restart coturn' # Restart
+
+  always:
+    - name: 'Remove temporary container files'
+      shell: 'rm {{ bbb_lxc_coturn_tmp_dir }}/coturn_*'
+      ignore_errors: true

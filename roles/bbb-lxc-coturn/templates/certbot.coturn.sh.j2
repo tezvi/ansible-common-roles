@@ -1,0 +1,8 @@
+#!/bin/bash -e
+# {{ ansible_managed }}
+for certfile in fullchain.pem privkey.pem ; do
+	cp -L /etc/letsencrypt/live/{{ bbb_lxc_coturn.hostname }}/"${certfile}" /etc/turnserver/"${certfile}".new
+	chown turnserver:turnserver /etc/turnserver/"${certfile}".new
+	mv /etc/turnserver/"${certfile}".new /etc/turnserver/"${certfile}"
+done
+systemctl kill -sUSR2 coturn.service

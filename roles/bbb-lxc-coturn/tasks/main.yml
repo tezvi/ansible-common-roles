@@ -1,0 +1,9 @@
+---
+
+- fail:
+    msg: 'Coturn LXC container configuration is not defined'
+  when: bbb_lxc_coturn is not defined or bbb_lxc_coturn.name is not defined or not bbb_lxc_coturn.name
+
+- include_tasks: install.yml
+
+- include_tasks: configure.yml
