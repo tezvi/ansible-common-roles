@@ -368,6 +368,41 @@ bbb_scalelite_tmp_dir: /tmp
 bbb_scalelite_recordings_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_post_publish.rb'
 bbb_scalelite_recordings_prune_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_prune_recordings.sh'
 ```
+
+### BigBlueButton Coturn STUN/TURN (bbb-lxc-coturn)
+Installs and configures Coturn server in a specific LXC container. Coturn server is used for TURN and STUN protocols that helps out users with firewall or network infrastructure limitations to access BBB meetings and share audio/video.
+
+Available variables:
+
+```yaml
+---
+# LXC TURN container configuration
+bbb_lxc_coturn:
+# name:
+# hostname:
+# ip_address:
+# realm:
+# email:
+# secret:
+
+# Temporary directory for file tem plating and configuration
+bbb_lxc_coturn_tmp_dir: /tmp
+
+# certbot coturn deploy config file
+bbb_lxc_coturn_certbot_deploy: /etc/letsencrypt/renewal-hooks/deploy/coturn
+
+# Coturn config file path
+bbb_lxc_coturn_config_file: /etc/turnserver.conf
+
+# Coturn DHP cert file
+bbb_lxc_coturn_etc_dir: /etc/turnserver/
+
+# Coturn DHP cert file
+bbb_lxc_coturn_dhp_file: "{{ bbb_lxc_coturn_etc_dir}}/dhp.pem"
+
+# Coturn systemd unit directory
+bbb_lxc_coturn_systemd_dir: "/etc/systemd/system/coturn.service.d"
+```
     
 ### Wkhtml
 Installs webkit based PDF renderer engine. 
