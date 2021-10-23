@@ -1,0 +1,84 @@
+---
+
+- block:
+  - command: 'lxc exec {{ lxc_instance.name }} -- bbb-conf --status'
+    register: bbb_instance_installed_stat
+
+  - command: 'lxc exec {{ lxc_instance.name }} -- sh -c "bbb-conf --secret | grep Secret: | cut -d: -f2"'
+    when: bbb_instance_installed_stat.rc is defined and bbb_instance_installed_stat.rc == 0
+    register: bbb_instance_secret_stat
+
+  - set_fact:
+      bbb_instance_secret: '{{ bbb_instance_secret_stat.stdout|trim }}'
+      bbb_instance_url: 'https://{{ lxc_instance.hostname }}/bigbluebutton/api/'
+
+  - name: '{{ lxc_instance.name }}: Render node_exporter docker-compose config'
+    template:
+      src: bbb/node_exporter_docker_compose.yaml.j2
+      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_docker_compose.yaml"
+      mode: 0644
+
+  - name: '{{ lxc_instance.name }}: Create node_exporter directory'
+    command: 'lxc exec {{ lxc_instance.name }} -- mkdir -p {{ bbb_lxc_node_exporter_dir }}'
+
+  - name: '{{ lxc_instance.name }}: Deploy docker-composer secrets file'
+    command: lxc exec {{ lxc_instance.name }} -- sh -c '{{ item }} {{ bbb_lxc_node_exporter_dir }}/.env'
+    with_items:
+      - 'echo API_BASE_URL={{ bbb_instance_url }} >'
+      - 'echo API_SECRET={{ bbb_instance_secret }} >>'
+
+  - name: '{{ lxc_instance.name }}: Deploy new docker-composer file'
+    command: >-
+      lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_docker_compose.yaml
+        {{ lxc_instance.name }}{{ bbb_lxc_node_exporter_dir }}/docker-compose.yaml
+
+  - name: '{{ lxc_instance.name }}: Run docker prometheus node_exporter'
+    command:
+      cmd: "lxc exec {{ lxc_instance.name }} -- sh -c 'cd {{ bbb_lxc_node_exporter_dir }}; docker-compose up -d --force-recreate'"
+
+  - fail:
+      msg: "Password must not exceed limit of 8 characters, given {{ bbb_lxc_node_exporter_pass|length }} characters"
+    when: bbb_lxc_node_exporter_pass and bbb_lxc_node_exporter_pass|length > 8
+
+  - name: '{{ lxc_instance.name }}: Configure nginx password file'
+    command:
+      cmd: "lxc exec {{ lxc_instance.name }} -- sh -c '{{ item }}'"
+    with_items:
+      - "echo -n \"{{ bbb_lxc_node_exporter_user }}:\" > {{ bbb_lxc_node_exporter_dir }}/.htpasswd"
+      - "openssl passwd \"{{ bbb_lxc_node_exporter_pass }}\" >> {{ bbb_lxc_node_exporter_dir }}/.htpasswd"
+    when: bbb_lxc_node_exporter_pass
+
+  - name: '{{ lxc_instance.name }}: Render node_exporter nginx template'
+    template:
+      src: bbb/nginx_prometheus_node_exporter.conf.j2
+      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_nginx_node_exporter.conf"
+      mode: 0644
+
+  - name: 'Deploy new node_exporter nginx config file'
+    command: >-
+      lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_nginx_node_exporter.conf
+        {{ lxc_instance.name }}{{ bbb_lxc_node_exporter_nginx_config }}
+
+  - name: '{{ lxc_instance.name }}: Detect nginx node_exporter include directive'
+    command:
+      cmd: 'lxc exec {{ lxc_instance.name }} -- grep {{ bbb_lxc_node_exporter_nginx_config }}; /etc/nginx/sites-enabled/bigbluebutton'
+    ignore_errors: true
+    register: bbb_lxc_node_exporter_nginx_stat
+
+  - name: '{{ lxc_instance.name }}: Add nginx node_exporter config include directive'
+    command:
+      cmd: >-
+        lxc exec {{ lxc_instance.name }} -- sh -c
+        "sed -i '/ssl_certificate \//i include {{ bbb_lxc_node_exporter_nginx_config }};\n' /etc/nginx/sites-enabled/bigbluebutton"
+    when: bbb_lxc_node_exporter_nginx_stat.rc != 0
+
+  - name: '{{ lxc_instance.name }}: Test nginx configuration'
+    command: 'lxc exec {{ lxc_instance.name }} -- sh -c "nginx -T > /dev/null"'
+
+  - name: '{{ lxc_instance.name }}: Reload nginx'
+    command: 'lxc exec {{ lxc_instance.name }} -- systemctl reload nginx'
+
+  always:
+    - name: '{{ lxc_instance.name }}: Remove node_exporter temporary files'
+      shell: 'rm {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_*'
+      ignore_errors: true

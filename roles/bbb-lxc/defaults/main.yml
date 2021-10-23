@@ -36,6 +36,22 @@ bbb_lxc_local_slides:
   - 'default.pptx'
   - 'default.pdf'
 
+# Install prometheus node exporter
+bbb_lxc_install_node_exporter: true
+
+# BBB node exporter docker directory
+bbb_lxc_node_exporter_dir: /opt/bbb_node_exporter
+
+# BBB node exporter nginx config file
+bbb_lxc_node_exporter_nginx_config: '{{ bbb_lxc_node_exporter_dir}}/nginx_prometheus_node_exporter.conf'
+
+# Username and password for Prometheus HTTP authentication
+bbb_lxc_node_exporter_user: bbb_prometheus
+bbb_lxc_node_exporter_pass:
+
+# Limit node_exporter nginx proxy to allow only requests from this ip address
+bbb_lxc_node_exporter_ip_address:
+
 # Defines a hostname for turn/turns server
 bbb_lxc_turn_server:
 # Turn/turns server secret

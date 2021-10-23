@@ -1,0 +1,33 @@
+version: '3.2'
+services:
+  bbb-exporter:
+    container_name: bbb-exporter
+    image: greenstatic/bigbluebutton-exporter:v0.6.0
+    network_mode: host
+    volumes:
+      # Can be removed if `RECORDINGS_METRICS_READ_FROM_DISK` is set to false (or omitted).
+      # See https://bigbluebutton-exporter.greenstatic.dev/exporter-user-guide/#optimizations for details.
+      - "/var/bigbluebutton:/var/bigbluebutton:ro"
+    environment:
+      BIND_IP: "127.0.0.1"
+      RECORDINGS_METRICS_READ_FROM_DISK: "true"
+      PORT: 9688
+      RECORDINGS_METRICS: "true"
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  node_exporter:
+    container_name: node_exporter
+    image: prom/node-exporter:v1.2.2
+    network_mode: host
+    command:
+      - "--path.rootfs=/host"
+      - "--web.listen-address=127.0.0.1:9100"
+    pid: "host"
+    volumes:
+      - type: "bind"
+        source: "/"
+        target: "/host"
+        read_only: true
+    restart: unless-stopped
