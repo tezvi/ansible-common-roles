@@ -1,23 +1,28 @@
 # {{ ansible_managed }}
 # prometheus node_exporter metrics
-location /node_exporter/ {
-    auth_basic "node_exporter";
+location /metrics/ {
+    auth_basic "metrics auth";
     auth_basic_user_file {{ bbb_lxc_node_exporter_dir }}/.htpasswd;
-    proxy_pass http://127.0.0.1:9100/;
-    include proxy_params;
-    allow {{ lxc_instance.ip_address }};
-    {% if bbb_lxc_node_exporter_ip_address -%}
-    allow {{ bbb_lxc_node_exporter_ip_address }};
-    {% endif -%}
-    deny all;
-}
 
-# prometheus node_exporter BBB metrics
-location /bbb_node_exporter/ {
-    auth_basic "node_exporter";
-    auth_basic_user_file {{ bbb_lxc_node_exporter_dir }}/.htpasswd;
-    proxy_pass http://127.0.0.1:9688/;
-    include proxy_params;
+    location /metrics/node_exporter/ {
+        proxy_pass http://127.0.0.1:9100/;
+        include proxy_params;
+    }
+
+    {% if lxc_instance.install_bbb %}
+    # prometheus node_exporter BBB metrics
+    location /metrics/bbb_node_exporter/ {
+        proxy_pass http://127.0.0.1:9688/;
+        include proxy_params;
+    }
+    {% endif %}
+
+    # Expose NetData metrics
+    location /metrics/netdata/ {
+        proxy_pass http://127.0.0.1:19999/;
+        include proxy_params;
+    }
+
     allow {{ lxc_instance.ip_address }};
     {% if bbb_lxc_node_exporter_ip_address -%}
     allow {{ bbb_lxc_node_exporter_ip_address }};

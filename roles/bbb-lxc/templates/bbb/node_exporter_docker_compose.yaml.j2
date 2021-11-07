@@ -1,5 +1,6 @@
 version: '3.2'
 services:
+  {% if lxc_instance.install_bbb -%}
   bbb-exporter:
     container_name: bbb-exporter
     image: greenstatic/bigbluebutton-exporter:v0.6.0
@@ -16,6 +17,7 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+  {% endif %}
 
   node_exporter:
     container_name: node_exporter
@@ -31,3 +33,28 @@ services:
         target: "/host"
         read_only: true
     restart: unless-stopped
+
+  netdata:
+    image: netdata/netdata:latest
+    container_name: netdata
+    hostname: localhost
+    environment:
+      DOCKER_USR: 1026
+      DOCKER_GRP: 100
+      DO_NOT_TRACK: 1
+    ports:
+      - 19999:19999
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - ./netdataconfig/netdata:/etc/netdata
+      - ./netdatalib:/var/lib/netdata
+      - ./netdatacache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro

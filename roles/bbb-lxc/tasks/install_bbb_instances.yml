@@ -1,8 +1,7 @@
 ---
 
 - name: Install BBB
-#  include_tasks: bbb/install_bbb.yml
-  include_tasks: bbb/install_node_exporter.yml
+  include_tasks: bbb/install_bbb.yml
   when: lxc_instance.install_bbb|default(false)
   loop: '{{ bbb_lxc_instances }}'
   loop_control:

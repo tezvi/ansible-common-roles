@@ -88,3 +88,4 @@ bbb_lxc_instances: []
 #    dns_servers:
 #    profile:
 #    image:
+#    install_node_exporter:
