@@ -1,0 +1,8 @@
+---
+
+- name: Install Node exporters and metrics
+  include_tasks: install_node_exporter.yml
+  when: lxc_instance.install_node_exporter|default(bbb_lxc_install_node_exporter)
+  loop: '{{ bbb_lxc_instances }}'
+  loop_control:
+    loop_var: lxc_instance
