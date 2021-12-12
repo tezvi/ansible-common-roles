@@ -293,6 +293,8 @@ bbb_lxc_recording_timer_file: /etc/systemd/system/bbb-record-core.timer.d/overri
 bbb_lxc_multiple_kurentos: true
 # Optional HTML5 document title to shot in browser
 bbb_lxc_html5_title: ''
+# Set URL for collecting HTML5 client logs
+bbb_lxc_html5_external_debug_url: ''
 # Path to BBB shared directory
 bbb_lxc_shared_dir: /opt/bbbshared/instances
 # Path to playbook local directory where default slides are located
@@ -301,6 +303,18 @@ bbb_lxc_local_slides_dir: '{{ playbook_dir }}/../files/bbb'
 bbb_lxc_local_slides:
   - 'default.pptx'
   - 'default.pdf'
+
+# Install prometheus node exporter
+bbb_lxc_install_node_exporter: true
+# BBB node exporter docker directory
+bbb_lxc_node_exporter_dir: /opt/bbb_node_exporter
+# BBB node exporter nginx config file
+bbb_lxc_node_exporter_nginx_config: '{{ bbb_lxc_node_exporter_dir}}/nginx_prometheus_node_exporter.conf'
+# Username and password for Prometheus HTTP authentication
+bbb_lxc_node_exporter_user: bbb_prometheus
+bbb_lxc_node_exporter_pass:
+# Limit node_exporter nginx proxy to allow only requests from this ip address
+bbb_lxc_node_exporter_ip_address:
 
 # Defines a hostname for turn/turns server
 bbb_lxc_turn_server:
@@ -336,6 +350,7 @@ bbb_lxc_instances: []
 #    dns_servers:
 #    profile:
 #    image:
+#    install_node_exporter:
 ```
 
 ### BigBlueButton Scalelite (bbb-lxc-scalelite)
