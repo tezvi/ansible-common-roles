@@ -27,6 +27,8 @@ bbb_lxc_recording_timer_file: /etc/systemd/system/bbb-record-core.timer.d/overri
 bbb_lxc_multiple_kurentos: true
 # Optional HTML5 document title to shot in browser
 bbb_lxc_html5_title: ''
+# Set URL for collecting HTML5 client logs
+bbb_lxc_html5_external_debug_url: ''
 # Path to BBB shared directory
 bbb_lxc_shared_dir: /opt/bbbshared/instances
 # Path to playbook local directory where default slides are located
