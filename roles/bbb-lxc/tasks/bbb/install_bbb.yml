@@ -5,6 +5,15 @@
     ignore_errors: true
     register: bbb_lxc_installed_stat
 
+  # Fix broken symlinks to prevent DPKG configure problems if BBB upgrading
+  - name: '{{ lxc_instance.name }}: Fix potential BBB nginx bad symlinks'
+    command: >
+      lxc exec {{ lxc_instance.name }} -- bash -c
+      "[[ -f /etc/nginx/sites-enabled/{{ item }} && ! -L /etc/nginx/sites-enabled/{{ item }} ]] && (rm /etc/nginx/sites-enabled/{{ item }}; ln -s /etc/nginx/sites-available/{{ item }} /etc/nginx/sites-enabled/{{ item }}) || echo"
+    with_items:
+      - bigbluebutton
+      - default
+
   - name: '{{ lxc_instance.name }}: Install BBB'
     command:
       cmd: "lxc exec {{ lxc_instance.name }} -- sh -c '{{ item }}'"
@@ -270,14 +279,14 @@
            or bbb_lxc_turn_configured_stat.changed }}"
 
   - name: '{{ lxc_instance.name }}: Check default http redirect'
-    command: "lxc exec {{ lxc_instance.name }} -- grep 'return 301 {{ bbb_lxc_bbb_redirect_url }};' /etc/nginx/sites-enabled/default"
+    command: "lxc exec {{ lxc_instance.name }} -- grep 'return 301 {{ bbb_lxc_bbb_redirect_url }};' /etc/nginx/sites-available/default"
     ignore_errors: true
     register: bbb_lxc_http_redirect_stat
 
   - name: '{{ lxc_instance.name }}: Set default http redirect'
     command: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'
     with_items:
-      - "sh -c 'sed -i \"/server_name _;/ireturn 301 {{ bbb_lxc_bbb_redirect_url }};\" /etc/nginx/sites-enabled/default'"
+      - "sh -c 'sed -i \"/server_name _;/ireturn 301 {{ bbb_lxc_bbb_redirect_url }};\" /etc/nginx/sites-available/default'"
       - 'systemctl reload nginx'
     when: bbb_lxc_http_redirect_stat.rc != 0
 
