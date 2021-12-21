@@ -1,0 +1,8 @@
+---
+
+- name: Install Filebeat agent for collecting ELK logs
+  include_tasks: install_filebeat.yml
+  when: lxc_instance.install_filebeat|default(bbb_lxc_install_filebeat)
+  loop: '{{ bbb_lxc_instances }}'
+  loop_control:
+    loop_var: lxc_instance

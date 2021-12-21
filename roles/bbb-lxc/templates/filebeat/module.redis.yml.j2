@@ -1,0 +1,32 @@
+# {{ ansible_managed }}
+# Module: redis
+# Docs: https://www.elastic.co/guide/en/beats/filebeat/7.x/filebeat-module-redis.html
+
+- module: redis
+  # Main logs
+  log:
+    enabled: {{ 'true' if lxc_instance.install_bbb else 'false' }}
+
+    # Set custom paths for the log files. If left empty,
+    # Filebeat will choose the paths depending on your OS.
+    #var.paths: ["/var/log/redis/redis-server.log*"]
+
+    {% if bbb_lxc_filebeat_include_pattern -%}
+    input:
+        include_lines: ['{{ bbb_lxc_filebeat_include_pattern }}']
+    {% endif %}
+
+  # Slow logs, retrieved via the Redis API (SLOWLOG)
+  slowlog:
+    enabled: {{ 'true' if lxc_instance.install_bbb else 'false' }}
+
+    # The Redis hosts to connect to.
+    #var.hosts: ["localhost:6379"]
+
+    # Optional, the password to use when connecting to Redis.
+    #var.password:
+
+    {% if bbb_lxc_filebeat_include_pattern -%}
+    input:
+        include_lines: ['{{ bbb_lxc_filebeat_include_pattern }}']
+    {% endif %}

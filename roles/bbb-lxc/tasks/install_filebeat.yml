@@ -1,0 +1,96 @@
+---
+
+- block:
+  - name: '{{ lxc_instance.name }}: Configure Filebeat apt repository'
+    command: 'lxc exec {{ lxc_instance.name }} -- sh -c "{{ item }}"'
+    with_items:
+      - 'wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -'
+      - 'apt-get install apt-transport-https'
+      - "echo 'deb https://artifacts.elastic.co/packages/7.x/apt stable main' > /etc/apt/sources.list.d/elastic-7.x.list"
+
+  - name: '{{ lxc_instance.name }}: Install and configure Filebeat service'
+    command: 'lxc exec {{ lxc_instance.name }} -- sh -c "{{ item }}"'
+    with_items:
+      - 'apt-get update'
+      - 'apt-get install -y --force-yes filebeat'
+      - 'systemctl is-enabled filebeat || systemctl enable filebeat'
+      - 'systemctl start filebeat'
+      - 'mkdir -p /etc/filebeat/inputs.d'
+
+  - name: '{{ lxc_instance.name }}: configure filebeat client certificate directory'
+    command: 'lxc exec {{ lxc_instance.name }} -- sh -c "{{ item }}"'
+    with_items:
+      - 'mkdir -p {{ bbb_lxc_filebeat_cert_dir }}'
+      - 'chown -R root:root {{ bbb_lxc_filebeat_cert_dir }}'
+      - 'chmod -R 750 {{ bbb_lxc_filebeat_cert_dir }}'
+    when: bbb_lxc_filebeat_cert_dir != ''
+
+  - set_fact:
+      filebeat_certs:
+        - src: '{{ bbb_lxc_filebeat_cacert }}'
+          name: ca.crt
+        - src: '{{ bbb_lxc_filebeat_clientcert }}'
+          name: client.crt
+        - src: '{{ bbb_lxc_filebeat_clientkey }}'
+          name: client.key
+
+  - name: '{{ lxc_instance.name }}: Copy filebeat certs'
+    copy:
+      src: '{{ item.src }}'
+      dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item.name }}'
+    with_items: '{{ filebeat_certs }}'
+    when: item.src != ''
+
+  - name: '{{ lxc_instance.name }}: Deploy filebeat client certs'
+    command:
+      cmd: 'lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item.name }} {{ lxc_instance.name }}/{{ bbb_lxc_filebeat_cert_dir }}/{{ item.name }}'
+    with_items: '{{ filebeat_certs }}'
+    when: item.src != ''
+
+  - name: '{{ lxc_instance.name }}: Render Filebeat config files'
+    template:
+      src: "{{ item.template }}"
+      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item.dest }}"
+      mode: 0644
+    with_items:
+      - template: filebeat/filebeat.yml.j2
+        dest: filebeat.yml
+      - template: filebeat/inputs.yml.j2
+        dest: inputs.yml
+      - template: filebeat/module.nginx.yml.j2
+        dest: nginx.yml
+      - template: filebeat/module.redis.yml.j2
+        dest: redis.yml
+      - template: filebeat/module.mongodb.yml.j2
+        dest: mongodb.yml
+      - template: filebeat/module.system.yml.j2
+        dest: system.yml
+
+  - name: '{{ lxc_instance.name }}: Deploy Filebeat configuration file'
+    command: >
+      lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item.src }} {{ lxc_instance.name }}{{ item.dest }}
+    with_items:
+      - src: filebeat.yml
+        dest: /etc/filebeat/filebeat.yml
+      - src: inputs.yml
+        dest: /etc/filebeat/inputs.d/inputs.yml
+      - src: nginx.yml
+        dest: /etc/filebeat/modules.d/nginx.yml
+      - src: redis.yml
+        dest: /etc/filebeat/modules.d/redis.yml
+      - src: mongodb.yml
+        dest: /etc/filebeat/modules.d/mongodb.yml
+      - src: system.yml
+        dest: /etc/filebeat/modules.d/system.yml
+
+  - name: '{{ lxc_instance.name }}: Restart filebeat service'
+    command: 'lxc exec {{ lxc_instance.name }} -- sh -c "{{ item }}"'
+    with_items:
+      - 'systemctl restart filebeat'
+      - 'sleep 5'
+      - 'systemctl -q is-active filebeat'
+
+  always:
+    - name: '{{ lxc_instance.name }}: Remove filebeat temporary files'
+      shell: 'rm {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_*'
+      ignore_errors: true
