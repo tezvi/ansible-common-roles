@@ -304,6 +304,22 @@ bbb_lxc_local_slides:
   - 'default.pptx'
   - 'default.pdf'
 
+# Install Filebeat agent, unless disabled on instance config
+bbb_lxc_install_filebeat: true
+# Logstash URL that will be used as Filebeat output
+bbb_lxc_filebeat_logstash_url:
+# Default Filebeat input include_lines pattern
+bbb_lxc_filebeat_include_pattern: '(ERR|WARN|error|warn|warning|critical|urgent|fail)'
+# Default Filebeat certificates directory
+bbb_lxc_filebeat_cert_dir: /etc/filebeat/certs
+# Local CA certificate file, more info on how to setup certs can be found here
+# https://kifarunix.com/easy-way-to-configure-filebeat-logstash-ssl-tls-connection/
+bbb_lxc_filebeat_cacert: '{{ playbook_dir }}/../files/bbb/filebeat_ca.crt'
+# Local Certificate file
+bbb_lxc_filebeat_clientcert: '{{ playbook_dir }}/../files/bbb/filebeat_client.crt'
+# Local private key file
+bbb_lxc_filebeat_clientkey: '{{ playbook_dir }}/../files/bbb/filebeat_client.key'
+
 # Install prometheus node exporter
 bbb_lxc_install_node_exporter: true
 # BBB node exporter docker directory

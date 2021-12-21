@@ -1,0 +1,133 @@
+# {{ ansible_managed }}
+{% if lxc_instance.install_bbb %}
+### Bigbluebutton logs ###
+- type: filestream
+
+  # Change to true to enable this input configuration.
+  enabled: true
+
+  # Paths that should be crawled and fetched. Glob based paths.
+  paths:
+    - /var/log/bigbluebutton/**/*.log
+    - /var/log/bbb-*/*.log
+    - /var/log/kurento-media-server/*.log
+
+  # Exclude files. A list of regular expressions to match. Filebeat drops the files that
+  # are matching any regular expression from the list. By default, no files are dropped.
+  prospector.scanner.exclude_files:
+    - '.gz$'
+    - 'archive-'
+    - 'bbb-web\.\d+'
+
+  {% if bbb_lxc_filebeat_include_pattern -%}
+  include_lines: ['{{ bbb_lxc_filebeat_include_pattern }}']
+  {% endif %}
+
+  tags: ["bigbluebutton"]
+{% endif %}
+
+{% if bbb_scalelite_lxc is defined and lxc_instance.name == bbb_scalelite_lxc.name %}
+### Scalelite logs ###
+- type: filestream
+
+  # Change to true to enable this input configuration.
+  enabled: true
+
+  # Paths that should be crawled and fetched. Glob based paths.
+  paths:
+    - /opt/scalelite-run/log/certbot/*.log
+    - /opt/scalelite-run/log/scalelite-api/*.log
+    - /opt/scalelite-run/log/scalelite-poller/*.log
+    - /opt/scalelite-run/log/scalelite-recording-importer/*.log
+
+  # Exclude files. A list of regular expressions to match. Filebeat drops the files that
+  # are matching any regular expression from the list. By default, no files are dropped.
+  prospector.scanner.exclude_files:
+    - '.gz$'
+
+  {% if bbb_lxc_filebeat_include_pattern -%}
+  include_lines: ['{{ bbb_lxc_filebeat_include_pattern }}']
+  {% endif %}
+
+  tags: ["scalelite"]
+
+- type: filestream
+  # Change to true to enable this input configuration.
+  enabled: true
+  # Paths that should be crawled and fetched. Glob based paths.
+  paths:
+    - /var/log/scalelite_transfer_recordings.log
+  # Exclude files. A list of regular expressions to match. Filebeat drops the files that
+  # are matching any regular expression from the list. By default, no files are dropped.
+  prospector.scanner.exclude_files:
+    - '.gz$'
+  multiline.type: pattern
+  multiline.pattern: '^=== Sync started'
+  multiline.negate: true
+  multiline.match: after
+
+  tags: ["scalelite", "scalelite-recordings"]
+
+- type: container
+  paths:
+    - '/var/lib/docker/containers/*/*.log'
+
+  {% if bbb_lxc_filebeat_include_pattern -%}
+  include_lines: ['{{ bbb_lxc_filebeat_include_pattern }}']
+  {% endif %}
+
+  tags: ["scalelite", "docker"]
+
+{% endif %}
+
+{% if bbb_lxc_coturn is defined and lxc_instance.name == bbb_lxc_coturn.name %}
+### Coturn logs ###
+- type: filestream
+
+  # Change to true to enable this input configuration.
+  enabled: true
+
+  # Paths that should be crawled and fetched. Glob based paths.
+  paths:
+    - /var/log/turnserver/turnserver.log*
+
+  # Exclude files. A list of regular expressions to match. Filebeat drops the files that
+  # are matching any regular expression from the list. By default, no files are dropped.
+  prospector.scanner.exclude_files:
+    - '.gz$'
+
+  {% if bbb_lxc_filebeat_include_pattern -%}
+  include_lines: ['{{ bbb_lxc_filebeat_include_pattern }}']
+  {% endif %}
+
+  tags: ["coturn"]
+{% endif %}
+
+### Default system log directory ###
+- type: filestream
+
+  # Change to true to enable this input configuration.
+  enabled: true
+
+  # Paths that should be crawled and fetched. Glob based paths.
+  paths:
+    - /var/log/unattended-upgrades/*.log
+    - /var/log/letsencrypt/*.log
+    - /var/log/lxd/*.log
+    - /var/log/grafana/*.log
+    - /var/log/filebeat/filebeat
+
+  {% if bbb_lxc_filebeat_include_pattern -%}
+  include_lines: ['{{ bbb_lxc_filebeat_include_pattern }}']
+  {% endif %}
+
+  # Exclude files. A list of regular expressions to match. Filebeat drops the files that
+  # are matching any regular expression from the list. By default, no files are dropped.
+  prospector.scanner.exclude_files:
+    - '.gz$'
+
+  tags: ["var-logs"]
+
+#- type: journald
+#  id: everything
+#  tags: ["journald"]
