@@ -61,7 +61,7 @@
           dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bbb-html5-frontend@.service'
         - src: '/lib/systemd/system/freeswitch.service'
           dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_freeswitch.service'
-    when: lxc_instance.bbb_version == 'bionic-23'
+    when: lxc_instance.bbb_version == 'bionic-23' or lxc_instance.bbb_version == 'bionic-24'
 
   - name: '{{ lxc_instance.name }}: Copy BBB config files to host for provisioning'
     command:
