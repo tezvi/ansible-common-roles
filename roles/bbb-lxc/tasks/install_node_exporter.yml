@@ -1,5 +1,18 @@
 ---
 
+- command: 'lxc exec {{ lxc_instance.name }} -- bbb-conf --status'
+  register: bbb_instance_ready_stat
+  ignore_errors: true
+
+- set_fact:
+    bbb_instance_ready: '{{ bbb_instance_ready_stat.rc is defined and bbb_instance_ready_stat.rc == 0 }}'
+
+- name: '{{ lxc_instance.name }}: emit warning when BBB is not ready for node_exporter installation'
+  fail:
+    msg: "Warning: BBB is not ready or not installed for node_exporter installation"
+  when: not bbb_instance_ready
+  ignore_errors: true
+
 - block:
   - name: '{{ lxc_instance.name }}: Create node_exporter directory'
     command: 'lxc exec {{ lxc_instance.name }} -- mkdir -p {{ item }}'
@@ -17,14 +30,15 @@
 
   - block:
       - command: 'lxc exec {{ lxc_instance.name }} -- bbb-conf --status'
-        register: bbb_instance_installed_stat
+        register: bbb_instance_ready_stat
+        ignore_errors: true
 
       - command: 'lxc exec {{ lxc_instance.name }} -- sh -c "bbb-conf --secret | grep Secret: | cut -d: -f2"'
-        when: bbb_instance_installed_stat.rc is defined and bbb_instance_installed_stat.rc == 0
+        when: bbb_instance_ready_stat.rc is defined and bbb_instance_ready_stat.rc == 0
         register: bbb_instance_secret_stat
 
       - set_fact:
-          bbb_instance_secret: '{{ bbb_instance_secret_stat.stdout|trim }}'
+          bbb_instance_secret: "{{ (bbb_instance_secret_stat.stdout if (bbb_instance_secret_stat.stdout is defined) else '')|trim }}"
           bbb_instance_url: 'https://{{ lxc_instance.hostname }}/bigbluebutton/api/'
 
       - name: '{{ lxc_instance.name }}: Deploy docker-composer secrets file'
@@ -86,6 +100,7 @@
   - name: '{{ lxc_instance.name }}: Reload nginx'
     command: 'lxc exec {{ lxc_instance.name }} -- systemctl reload nginx'
 
+  when: bbb_instance_ready
   always:
     - name: '{{ lxc_instance.name }}: Remove node_exporter temporary files'
       shell: 'rm {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_*'

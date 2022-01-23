@@ -166,9 +166,6 @@
     - name: '{{ lxc_instance.name }}: Enable shell LXC prompt script'
       shell: "lxc exec {{ lxc_instance.name }} -- sh -c \"grep 'shell-prompt-lxc.sh' /root/.bashrc || echo 'source /etc/profile.d/shell-prompt-lxc.sh' >> /root/.bashrc\""
 
-    - import_tasks: install_node_exporter.yaml
-      when: lxc_instance.install_node_exporter|default(bbb_lxc_install_node_exporter)
-
   always:
     - name: '{{ lxc_instance.name }}: Remove temporary container files'
       shell: 'rm {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_*'
