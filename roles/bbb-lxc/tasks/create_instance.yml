@@ -166,6 +166,13 @@
     - name: '{{ lxc_instance.name }}: Enable shell LXC prompt script'
       shell: "lxc exec {{ lxc_instance.name }} -- sh -c \"grep 'shell-prompt-lxc.sh' /root/.bashrc || echo 'source /etc/profile.d/shell-prompt-lxc.sh' >> /root/.bashrc\""
 
+    - name: '{{ lxc_instance.name }}: Update keyboard shortcuts in system wide intputrc config'
+      command:
+        cmd: "lxc exec {{ lxc_instance.name }} -- sed -i '{{ item }}' /etc/inputrc"
+      with_items:
+        - '/^#.*"\\e\[5~": history-search-backward$/s/^#\ //'
+        - '/^#.*"\\e\[6~": history-search-forward$/s/^#\ //'
+
   always:
     - name: '{{ lxc_instance.name }}: Remove temporary container files'
       shell: 'rm {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_*'
