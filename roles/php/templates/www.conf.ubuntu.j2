@@ -413,7 +413,7 @@ slowlog = /var/log/php-fpm/{{ php_web_domain }}-slow.log
 ; Note: path INI options can be relative and will be expanded with the prefix
 ; (pool, global or @prefix@)
 
-{% if oracle_is_installed %}
+{% if oracle_is_installed|default(false) %}
 env[TNS_ADMIN]={{ php_oci8_tns_admin }}
 env[NLS_SORT]={{ php_oci8_nls_sort }}
 env[NLS_LANG]={{ php_oci8_nls_lang }}
