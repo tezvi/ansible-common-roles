@@ -40,6 +40,6 @@
 
 - name: Restart FPM if installed
   service:
-    name: "{{ 'php-fpm' if is_rhel else 'php7.2-fpm' }}"
+    name: "{{ 'php-fpm' if is_rhel else 'php7.4-fpm' }}"
     state: restarted
   when: php_status.stat.exists

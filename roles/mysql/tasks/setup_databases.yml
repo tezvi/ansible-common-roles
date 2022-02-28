@@ -25,11 +25,13 @@
   copy:
     src: files/mysqldumps/
     dest: "{{ mysql_dump_dir }}"
+  ignore_errors: true
 
 - name: Check existing dump files
   stat:
     path: "{{ mysql_dump_dir }}/{{ item.dump_file }}"
   with_items: "{{ mysql_databases }}"
+  when: item.dump_file is defined
   register: mysql_dumps_stat
 
 - name: Import DB dumps to databases
@@ -40,6 +42,6 @@
     name: "{{ item.database }}"
     target: "{{ mysql_dump_dir }}/{{ item.dump_file }}"
   when: mysql_created_databases is defined and item.database in mysql_created_databases
-        and mysql_dumps_stat is defined and (mysql_dumps_stat.results|length>0)
+        and mysql_dumps_stat is defined and (mysql_dumps_stat.results|length>0) and item.dump_file is defined
   with_items: "{{ mysql_dumps_stat.results | selectattr('stat.exists') | map(attribute='item') | list }}"
   notify: Remove temporary dump files
