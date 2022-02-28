@@ -1,7 +1,7 @@
 ---
 - name: Install letsencrypt client
   apt:
-    name: python-certbot-apache
+    name: python3-certbot-apache
     state: latest
 
 - name: Create related directories
@@ -11,10 +11,27 @@
   with_items:
     - "/etc/{{ apache_distro_name }}/cert"
 
+#- name: Configure Apache LetsEncrypt endpoint
+#  template:
+#    src: letsencrypt-alias.conf.j2
+#    dest: "/etc/apache2/conf-available/letsencrypt.conf"
+#    mode: 0644
+#    owner: root
+#    group: root
+#  notify: Restart Apache
+#
+#- name: Symlink letsencrypt apache config
+#  file:
+#    src: "/etc/apache2/conf-available/letsencrypt.conf"
+#    dest: "/etc/apache2/conf-enabled/letsencrypt.conf"
+#    owner: root
+#    group: root
+#    state: link
+
 - name: Create letsencrypt certificate
   shell: >
-    letsencrypt -n --apache -w {{ http_document_root }} -m {{ letsencrypt_email }} \
-      --agree-tos -d {{ http_domain_name }} -d www.{{ http_domain_name }} --redirect
+    certbot -n --apache -w {{ http_document_root }} -m {{ letsencrypt_email }} \
+      --agree-tos -d {{ http_domain_name }} {{ "-d www.{{ http_domain_name }}" if letsencrypt_use_www else '' }} --redirect
   args:
     creates: "/etc/letsencrypt/live/{{ http_domain_name }}"
 
@@ -25,8 +42,6 @@
 
 - name: Add letsencrypt cronjob for certificate renewal
   cron:
-    name: letsencrypt_renewal
+    name: certbot_renewal
     special_time: weekly
-    job: >-
-      letsencrypt certonly -n --apache -w {{ http_document_root }} -m {{ letsencrypt_email }}
-      --agree-tos -d {{ http_domain_name }} -d www.{{ http_domain_name }} && systemctl reload apache2
+    job: 'certbot certonly -n --apache -w {{ http_document_root }} -m {{ letsencrypt_email }} --agree-tos -d {{ http_domain_name }} {{ "-d www.{{ http_domain_name }}" if letsencrypt_use_www else "" }} && systemctl reload apache2'
