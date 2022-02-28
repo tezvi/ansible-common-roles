@@ -2,6 +2,7 @@
 - include: install.yml
 
 - include: install_oci8.yml
+  when: php_oci8_install|default(false)
 
 - include: configure.yml
 

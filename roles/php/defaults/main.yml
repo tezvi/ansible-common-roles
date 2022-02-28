@@ -1,8 +1,9 @@
 ---
 php_web_domain: "{{ web_domain | default('example.com') }}"
 php_fpm_pool: www
-php_fpm_service: "{{ 'php-fpm' if is_rhel else 'php7.2-fpm' }}"
-php_fpm_conf_dir: "{{ '/etc/php.d' if is_rhel else '/etc/php/7.2/fpm' }}"
+php_version: 7.4
+php_fpm_service: '{{ "php-fpm" if is_rhel else "php" + php_version|string + "-fpm" }}'
+php_fpm_conf_dir: '{{ "/etc/php.d" if is_rhel else "/etc/php/" + php_version|string + "/fpm" }}'
 php_dist: "{{ 'rhel' if is_rhel else 'ubuntu' }}"
 # PHP-FPM socket used by Apache and PHP-FPM.
 php_proc_run_dir: "/run/{{ 'php-fpm' if is_rhel else 'php' }}"
@@ -65,6 +66,7 @@ extension_modules_dir: "{{ '/usr/lib64/php/modules' if is_rhel else '/usr/lib/ph
 oracle_instantclient_include: /usr/include/oracle/12.2/client64
 
 # Oracle related options.
+php_oci8_install: false # Set to true to install OCI8 support.
 php_oci8_tns_admin: /usr/lib/oracle/12.2/client64/network/admin
 php_oci8_nls_lang: AMERICAN_AMERICA.WE8MSWIN1252
 php_oci8_nls_sort: AMERICAN
