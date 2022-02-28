@@ -32,6 +32,10 @@
     owner: root
     group: root
 
+- name: Probe smtpd_relay_restrictions config
+  command: cat /etc/postfix/main.cf
+  register: postfix_config
+
 - name: Configure SMTPd relay restrictions
   lineinfile:
     path: /etc/postfix/main.cf
