@@ -4,4 +4,4 @@
 - include: configure.yml
 
 - include: lets_encrypt.yml
-  when: install_letsencrypt == true
+  when: install_letsencrypt|default(true)

@@ -41,16 +41,11 @@
     - "{{ app_user }}"
     - "{{ admin_user }}"
 
-- name: Copy user's bashrc
-  template:
-    src: appuser.bashrc.j2
-    dest: "/home/{{ app_user }}/.bashrc"
-    mode: 0644
-    owner: "{{ item }}"
-    group: "{{ item }}"
+- name: 'Update keyboard shortcuts in system wide intputrc config'
+  command: "sed -i '{{ item }}' /etc/inputrc"
   with_items:
-    - "{{ app_user }}"
-    - "{{ admin_user }}"
+    - '/^#.*"\\e\[5~": history-search-backward$/s/^#\ //'
+    - '/^#.*"\\e\[6~": history-search-forward$/s/^#\ //'
 
 - name: Checking for existing local user SSH keys
   local_action: stat path="{{ playbook_dir }}/files/{{ item }}.key.pub"

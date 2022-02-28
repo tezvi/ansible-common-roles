@@ -14,7 +14,7 @@
     DocumentRoot {{ http_document_root }}
     DirectoryIndex index.php index.html
 
-    ErrorLog /var/log/{{ apache_distro_name }}/{{ http_domain_name }}-error_log
+    ErrorLog /var/log/{{ apache_distro_name }}/{{ http_domain_name }}-error.log
     CustomLog /var/log/{{ apache_distro_name }}/{{ http_domain_name }}-access.log combined
 
     <FilesMatch \.php$>

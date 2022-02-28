@@ -3,6 +3,7 @@ http_document_root: "/var/www/{{ http_domain_name }}"
 http_domain_name: "{{ web_domain | default('example.com') }}"
 letsencrypt_email: ssl@example.com
 install_letsencrypt: true
+letsencrypt_use_www: true
 http_vhost_aliases:
   - "www.{{ http_domain_name }}"
   - "{{ app_user }}"

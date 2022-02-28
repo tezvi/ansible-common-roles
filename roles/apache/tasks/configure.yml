@@ -42,19 +42,19 @@
 
 - name: Configure Apache document root directory
   file:
-    path: "/var/www/{{ http_domain_name }}"
+    path: "{{ http_document_root }}"
     state: directory
     mode: u=rwx,g=rx,o=rx
     owner: "{{ app_user }}"
     group: www-data
 
-- name: Enables default Apache2 SSL site
+- name: Enables default Apache2 site
   command: "a2ensite {{ item }}"
   args:
     creates: "/etc/apache2/sites-enabled/{{ item }}.conf"
   with_items:
-    - 000-default
-    - default-ssl
+#    - 000-default
+#    - default-ssl
     - "{{ http_domain_name }}"
 
 - name: Prevent access to default Apache sites
@@ -66,10 +66,15 @@
     group: root
   notify: Restart Apache
 
-- name: Enables default Apache2 SSL site
+- name: Prevent default html dir from public reading
   command: a2enconf deny-default-site
   args:
     creates: "/etc/apache2/conf-enabled/deny-default-site.conf"
+  notify: Restart Apache
+
+- name: Disable default apache sites
+  command: a2dissite default-ssl 000-default
+  notify: Restart Apache
 
 - name: Allow UFW port 80 and 443
   ufw:
