@@ -11,7 +11,7 @@
 
 - name: Restart Dovecot
   service:
-    name: dovecort
+    name: dovecot
     state: restarted
 
 - name: Restart opendkim
