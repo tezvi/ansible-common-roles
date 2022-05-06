@@ -15,11 +15,10 @@ export LSCOLORS=Gxfxcxdxbxegedabagacad
 
 function get_lxc_env() {
   LXC_TAG=$(cat /etc/lxc_tag)
-  if grep lxc /proc/1/environ &> /dev/null; then
-    if [[ ! -z "$LXC_TAG" ]]; then
-       LXC_TAG=":$LXC_TAG"
-    fi
-    echo -e "[lxc$LXC_TAG] "
+  if [[ ! -z "$LXC_TAG" ]]; then
+      echo -e "[lxc:$LXC_TAG] "
+  elif grep lxc /proc/1/environ &> /dev/null; then
+      echo -e "[lxc] "
   fi
 }
 
