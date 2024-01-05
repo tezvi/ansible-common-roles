@@ -7,8 +7,8 @@
     - 'dpkg --configure -a'
 #    - 'add-apt-repository ppa:certbot/certbot'
     - 'apt-get update -y'
-    - 'apt-get upgrade -y --force-yes'
-    - 'apt-get autoremove -y --force-yes'
+    - 'apt-get upgrade -y --allow=yes'
+    - 'apt-get autoremove -y --allow=yes'
   become: true
   # apt tasks can have locks acquired from other processes, retry several times before giving up.
   retries: 3
@@ -18,7 +18,7 @@
 
 - name: "Install COTURN server to existing LXC container"
   command:
-    cmd: "lxc exec {{ bbb_lxc_coturn.name }} -- apt-get install {{ item }} -y --force-yes"
+    cmd: "lxc exec {{ bbb_lxc_coturn.name }} -- apt-get install {{ item }} -y --allow=yes"
   with_items:
     - coturn
     - certbot

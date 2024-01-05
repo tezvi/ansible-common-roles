@@ -4,7 +4,7 @@
     msg: Container instance name cannot be empty
   when: not lxc_instance.name|length
 
-- name: '{{ lxc_instance.name }}: Check container existance'
+- name: '{{ lxc_instance.name }}: Check container existence'
   command:
     cmd: 'lxc info {{ lxc_instance.name }}'
   ignore_errors: true
@@ -140,7 +140,7 @@
 
     - name: '{{ lxc_instance.name }}: Install default tools and utilities'
       command:
-        cmd: "lxc exec {{ lxc_instance.name }} -- apt-get install {{ item }} -y --force-yes"
+        cmd: "lxc exec {{ lxc_instance.name }} -- apt-get install {{ item }} -y"
       with_items: "{{ bbb_lxc_default_packages }}"
 
     - name: '{{ lxc_instance.name }}: Configure global git user'

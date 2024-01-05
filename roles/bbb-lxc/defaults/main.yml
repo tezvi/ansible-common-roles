@@ -1,10 +1,11 @@
 ---
 # URL path to official BBB bash install script
-bbb_lxc_bbb_install_url: 'https://ubuntu.bigbluebutton.org/bbb-install.sh'
+bbb_lxc_bbb_install_url: 'https://raw.githubusercontent.com/bigbluebutton/bbb-install/v2.7.x-release/bbb-install.sh'
 # If set BBB will automatically redirect user to this url for default document root
 bbb_lxc_bbb_redirect_url:
 # Path of index file for default document root
-bbb_lxc_bbb_index_file: '/var/www/bigbluebutton-default/index.html'
+# Uncomment for BBB lower than v2.4: bbb_lxc_bbb_index_file: '/var/www/bigbluebutton-default/index.html'
+bbb_lxc_bbb_index_file: '/var/www/bigbluebutton-default/assets/index.html'
 # Path to BBB properties file
 bbb_lxc_bbb_properties_file: '/usr/share/bbb-web/WEB-INF/classes/bigbluebutton.properties'
 # Path to Freeswitch configuration
@@ -17,10 +18,12 @@ bbb_lxc_bbb_html5unit_file: '{{ bbb_lxc_systemd_unit_dir }}/bbb-html5.service'
 bbb_lxc_net_bridged: true
 # If true role will force BBB install script even if BBB has already been installed
 bbb_lxc_force_bbb_install: false
+# Adjust CPU and scheduling policy for systemd units to prevent errors when running in LXC
+bbb_systemd_containerize_units: true
 # Temporary directory to use on host OS for template processing
 bbb_lxc_tmp_dir: /tmp
 # If true recordings will be processed only out of working hours
-bbb_lxc_recording_timer_enabled: true
+bbb_lxc_recording_timer_enabled: false
 # Path to recording timer file for systemd scheduling
 bbb_lxc_recording_timer_file: /etc/systemd/system/bbb-record-core.timer.d/override.conf
 # If true multiple kurentos instances will be configured via BBB install script

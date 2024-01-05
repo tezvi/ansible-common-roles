@@ -1,7 +1,7 @@
 ---
 php_web_domain: "{{ web_domain | default('example.com') }}"
 php_fpm_pool: www
-php_version: 7.4
+php_version: 8.1
 php_fpm_service: '{{ "php-fpm" if is_rhel else "php" + php_version|string + "-fpm" }}'
 php_fpm_conf_dir: '{{ "/etc/php.d" if is_rhel else "/etc/php/" + php_version|string + "/fpm" }}'
 php_dist: "{{ 'rhel' if is_rhel else 'ubuntu' }}"

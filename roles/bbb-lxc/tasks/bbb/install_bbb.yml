@@ -21,16 +21,16 @@
     with_items:
       - 'wget -O /root/bbb-install.sh {{ bbb_lxc_bbb_install_url }}'
       - '/bin/bash /root/bbb-install.sh -v {{ lxc_instance.bbb_version }} -w -s {{ lxc_instance.hostname }} -e {{ lxc_instance.email }}'
-      # Install homedir skeleton if omitted by install script. This might pile web error logs.
+      # Install homedir skeleton if omitted by installer script. This might pile web error logs.
       - 'mkhomedir_helper bigbluebutton'
       - 'mkdir -p /home/bigbluebutton/.cache/dconf'
-      - 'apt-get purge bbb-demo -y || echo "no BBB demos installed"'
+#      - 'apt-get purge bbb-demo -y || echo "no BBB demos installed"'
       - 'apt-get autoremove -y'
     when: bbb_lxc_force_bbb_install|bool or bbb_lxc_installed_stat.rc != 0
 
   - import_tasks: link_bbb_dir.yml
 
-    # Install homedir skeleton if omitted by install script. This might pile web error logs.
+    # Install homedir skeleton if omitted by installer script. This might pile web error logs.
   - name: '{{ lxc_instance.name }}: Fix bigbluebutton user homedir skeleton for'
     command:
       cmd: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'
@@ -61,7 +61,9 @@
           dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bbb-html5-frontend@.service'
         - src: '/lib/systemd/system/freeswitch.service'
           dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_freeswitch.service'
-    when: lxc_instance.bbb_version == 'bionic-23' or lxc_instance.bbb_version == 'bionic-24'
+    when: >
+      lxc_instance.bbb_version == 'bionic-23' or lxc_instance.bbb_version == 'bionic-24'
+      or lxc_instance.bbb_version == 'focal-270'
 
   - name: '{{ lxc_instance.name }}: Copy BBB config files to host for provisioning'
     command:
@@ -98,6 +100,32 @@
         replace: 'disableRecordingDefault=false'
       - find: 'muteOnStart=false'
         replace: 'muteOnStart=true'
+    when: lxc_instance.bbb_version != 'focal-270'
+
+  - name: '{{ lxc_instance.name }}: Provision BBB properties file'
+    lineinfile:
+      dest: "{{ bbb_template_files[0].dest }}"
+      regexp: "{{ item.find }}"
+      line: "{{ item.replace }}"
+      state: present
+    with_items:
+      - find: 'lockSettingsDisablePrivateChat=false'
+        replace: 'lockSettingsDisablePrivateChat=true'
+      - find: 'webcamsOnlyForModerator=false'
+        replace: 'webcamsOnlyForModerator=true'
+      - find: 'lockSettingsDisableNotes=false'
+        replace: 'lockSettingsDisableNotes=true'
+      - find: 'lockSettingsHideUserList=false'
+        replace: 'lockSettingsHideUserList=true'
+      - find: 'endWhenNoModerator=false'
+        replace: 'endWhenNoModerator=true'
+      - find: 'breakoutRoomsRecord=true'
+        replace: 'breakoutRoomsRecord=false'
+      - find: 'disableRecordingDefault=true'
+        replace: 'disableRecordingDefault=false'
+      - find: 'muteOnStart=false'
+        replace: 'muteOnStart=true'
+    when: lxc_instance.bbb_version == 'focal-270'
 
   - name: '{{ lxc_instance.name }}: Provision BBB html5 unit file'
     lineinfile:
@@ -106,6 +134,7 @@
       line: "{{ item.1.replace }} # lxc defused"
       state: present
       backrefs: yes
+    when: bbb_systemd_containerize_units
     with_nested:
       - "{{ bbb_template_files[2:] }}"
       - [
@@ -144,7 +173,9 @@
          'exec {{ lxc_instance.name }} -- systemctl daemon-reload']
       - "{{ bbb_template_files[2:] }}"
     register: bbb_lxc_html5_changed_stat
-    when: bbb_lxc_config_diff.results[2].rc != 0 or bbb_lxc_config_diff.results[3].rc|default(0) != 0
+    when: > 
+      bbb_systemd_containerize_units 
+        and (bbb_lxc_config_diff.results[2].rc != 0 or bbb_lxc_config_diff.results[3].rc|default(0) != 0)
 
   - name: '{{ lxc_instance.name }}: Push new Freeswitch config file'
     command:
@@ -248,7 +279,7 @@
       with_items: '{{ bbb_lxc_local_slides }}'
     - name: '{{ lxc_instance.name }}: Deploy default presentation PDF slides'
       command:
-        cmd: 'lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item }} {{ lxc_instance.name }}/var/www/bigbluebutton-default/{{ item }}'
+        cmd: 'lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_{{ item }} {{ lxc_instance.name }}/var/www/bigbluebutton-default/assets/{{ item }}'
       with_items: '{{ bbb_lxc_local_slides }}'
     when: bbb_lxc_slides_available|bool
 
