@@ -4,6 +4,7 @@
   command: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'
   with_items:
     - 'ln -nsf {{ bbb_scalelite_recordings_spool }} /var/bigbluebutton/spool'
+    - 'chown -h bigbluebutton: /var/bigbluebutton/spool'
 
 - name: '{{ lxc_instance.name }}: Check if spool directory is writable'
   command: 'lxc exec {{ lxc_instance.name }} -- {{ item }}'

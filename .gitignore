@@ -1,1 +1,4 @@
 *.retry
+inventory/**/*.yml
+inventory/hosts
+ansible.log

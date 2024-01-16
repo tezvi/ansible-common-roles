@@ -1,0 +1,17 @@
+---
+- name: "Restart BBB for each instance"
+  hosts: '{{ bbb_host }}'
+  handlers:
+    - include_tasks: ../handlers/global.yml
+  connection: ssh
+  become: yes
+  become_user: root
+  become_method: sudo
+  gather_facts: yes
+  force_handlers: true
+  any_errors_fatal: true
+
+  tasks:
+    - include_role:
+        name: bbb-lxc
+        tasks_from: restart_instances.yml

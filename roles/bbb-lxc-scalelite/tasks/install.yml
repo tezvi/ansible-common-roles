@@ -17,6 +17,14 @@
     cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- git clone {{ bbb_scalelite_git_repo }} {{ bbb_scalelite_dir }}'
   when: bbb_scalelite_run_exists.rc != 0
 
+- name: Update scalelite compose GIT package
+  command:
+    cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "{{ item }}"'
+  with_items:
+    - 'chdir {{ bbb_scalelite_dir }}; git reset --hard'
+    - 'chdir {{ bbb_scalelite_dir }}; git pull'
+  when: bbb_scalelite_run_exists.rc == 0
+
 - name: Configure Scalelite container UFW firewall
   command: 'lxc exec {{ bbb_scalelite_lxc.name }} -- ufw {{ item }}'
   with_items:

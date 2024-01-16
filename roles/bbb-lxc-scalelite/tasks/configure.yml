@@ -21,15 +21,20 @@
       register: bbb_scalelite_env_exists
       ignore_errors: true
 
-    - name: Create new env file for scalelite run template
-      template:
-        src: dotenv.j2
-        dest: "{{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_dotenv"
-      when: bbb_scalelite_env_exists.rc != 0
+    - block:
+        - name: Ensures {{ bbb_scalelite_dir }} dir exists
+          file:
+            path: "{{ bbb_scalelite_dir }}"
+            state: directory
 
-    - name: Copy scalelite configuration
-      command:
-        cmd: 'lxc file push {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_dotenv {{ bbb_scalelite_lxc.name }}/{{ bbb_scalelite_dir }}/.env'
+        - name: Create new env file for scalelite run template
+          template:
+            src: dotenv.j2
+            dest: "{{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_dotenv"
+
+        - name: Copy scalelite configuration
+          command:
+            cmd: 'lxc file push {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_dotenv {{ bbb_scalelite_lxc.name }}/{{ bbb_scalelite_dir }}/.env'
       when: bbb_scalelite_env_exists.rc != 0
 
     - command:
@@ -41,10 +46,7 @@
       command:
         cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "cd {{ bbb_scalelite_dir }}; {{ item }}"'
       with_items:
-        # update init-letsencrypt script to allow non-interactive mode for certbot and nginx docker reload
-        - "sed -i 's/$staging_arg \\/$staging_arg --non-interactive \\/g' init-letsencrypt.sh"
-        - "sed -i 's/exec scalelite-nginx/exec -T scalelite-nginx/g' init-letsencrypt.sh"
-        - "yes | ./init-letsencrypt.sh"
+        - "yes | ./init-letsencrypt.sh -n"
       when: bbb_scalelite_certbot_installed.rc != 0
 
     - name: Start Scalelite Docker containers

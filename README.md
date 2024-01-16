@@ -8,6 +8,10 @@ Start playbook with root remote ssh user on a newly created or non provisioned s
 
     ansible-playbook -i hosts default-playbook.yml -k -K
 
+Example with custom roles path and more logging.
+
+    ANSIBLE_ROLES_PATH=$(pwd)/roles ANSIBLE_LOG_PATH=ansible.log ansible-playbook -i inventory/hosts.ini -l custom_host_group -e '@inventory/group_vars/mef_bbb_dev.yml'  playbooks/example.yml -vvv
+
 Inventory file example "hosts":
 
     [localhost]

@@ -30,4 +30,13 @@ URL_HOST={{ bbb_scalelite_lxc.hostname }}
 LETSENCRYPT_EMAIL={{ bbb_scalelite_lxc.email }}
 #LETSENCRYPT_STAGING=0 # Set to 1 if you're testing your setup to avoid hitting request limits
 
-RECORDING_IMPORT_POLL={{ 'true' when bbb_scalelite_lxc.recording_poll else 'false' }}
+RECORDING_IMPORT_POLL={{ 'true' if bbb_scalelite_lxc.recording_poll else 'false' }}
+
+RAILS_LOG_TO_STDOUT=false
+
+SCALELITE_DOCKER_IMAGE={{ bbb_scalelite_docker_image_version }}
+
+### Required when recordings are enabled and using BigBlueButton Playback Proxy to serve the recordings.
+SCALELITE_RECORDINGS_DOCKER_IMAGE={{ bbb_scalelite_docker_recordings_image }}
+
+DOCKER_PROXY_NGINX_TEMPLATE=scalelite-proxy
