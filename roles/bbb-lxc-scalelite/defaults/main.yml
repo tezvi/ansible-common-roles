@@ -20,6 +20,6 @@ bbb_scalelite_recordings_spool: '{{ bbb_scalelite_recordings }}/spool'
 bbb_scalelite_spool_gid: 998
 bbb_scalelite_tmp_dir: /tmp
 bbb_scalelite_recordings_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_post_publish.rb'
-bbb_scalelite_recordings_prune_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_prune_recordings.sh'
+bbb_scalelite_recordings_prune_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_prune_recordings'
 bbb_scalelite_docker_image_version: 'blindsidenetwks/scalelite:v1.5.1.7'
 bbb_scalelite_docker_recordings_image: 'bigbluebutton/bbb-playback-proxy:focal-260-alpine'

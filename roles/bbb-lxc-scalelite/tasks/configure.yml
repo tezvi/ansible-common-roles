@@ -51,7 +51,7 @@
 
     - name: Start Scalelite Docker containers
       command:
-        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "cd {{ bbb_scalelite_dir }}; docker-compose stop; docker-compose up -d"'
+        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "cd {{ bbb_scalelite_dir }}; docker compose stop; docker-compose up -d"'
 
     - name: Provision scalelite api database
       command:

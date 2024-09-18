@@ -18,7 +18,10 @@ bbb_lxc_coturn_certbot_deploy: /etc/letsencrypt/renewal-hooks/deploy/coturn
 bbb_lxc_coturn_config_file: /etc/turnserver.conf
 
 # Coturn DHP cert file
-bbb_lxc_coturn_etc_dir: /etc/turnserver/
+bbb_lxc_coturn_etc_dir: /etc/turnserver
+
+# Coturn DHP cert file
+bbb_lxc_coturn_pid_dir: /run/turnserver
 
 # Coturn DHP cert file
 bbb_lxc_coturn_dhp_file: "{{ bbb_lxc_coturn_etc_dir}}/dhp.pem"
