@@ -3,5 +3,10 @@
 LimitNOFILE=1048576
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 ExecStart=
-ExecStart=/usr/bin/turnserver --daemon -c {{ bbb_lxc_coturn_config_file }} --pidfile /run/turnserver/turnserver.pid --no-stdout-log --simple-log --log-file /var/log/turnserver/turnserver.log
+ExecStart=/usr/bin/turnserver -c {{ bbb_lxc_coturn_config_file }} --pidfile {{ bbb_lxc_coturn_pid_dir }}/turnserver.pid --no-stdout-log --simple-log --log-file /var/log/turnserver/turnserver.log
 Restart=always
+User=turnserver
+Group=turnserver
+Type=notify
+InaccessibleDirectories=/home
+PrivateTmp=yes

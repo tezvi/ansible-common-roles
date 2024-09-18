@@ -60,6 +60,12 @@
           - 'exec {{ bbb_lxc_coturn.name }} -- chown -R turnserver:turnserver /var/log/turnserver'
           - 'file push {{ bbb_lxc_coturn_tmp_dir }}/coturn_logrotate.conf {{ bbb_lxc_coturn.name }}/etc/logrotate.d/coturn'
 
+      - name: 'Create run directory for pid file'
+        command: 'lxc {{ item }}'
+        with_items:
+          - 'exec {{ bbb_lxc_coturn.name }} -- mkdir -p {{ bbb_lxc_coturn_pid_dir }}'
+          - 'exec {{ bbb_lxc_coturn.name }} -- chown -R turnserver:turnserver {{ bbb_lxc_coturn_pid_dir }}'
+
       - name: 'Restart coturn server'
         command: 'lxc exec {{ bbb_lxc_coturn.name }} --  {{ item }}'
         with_items:
