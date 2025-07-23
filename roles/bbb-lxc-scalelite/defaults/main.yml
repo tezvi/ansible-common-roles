@@ -17,7 +17,7 @@ bbb_scalelite_git_repo: 'https://github.com/tezvi/scalelite-run.git'
 bbb_scalelite_shared: '/opt/bbbshared'
 bbb_scalelite_recordings: '{{ bbb_scalelite_shared }}/scalelite-recordings'
 bbb_scalelite_recordings_spool: '{{ bbb_scalelite_recordings }}/spool'
-bbb_scalelite_spool_gid: 998
+bbb_scalelite_spool_gid: 996
 bbb_scalelite_tmp_dir: /tmp
 bbb_scalelite_recordings_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_post_publish.rb'
 bbb_scalelite_recordings_prune_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_prune_recordings'
