@@ -6,3 +6,4 @@
   loop: '{{ bbb_lxc_instances }}'
   loop_control:
     loop_var: lxc_instance
+    label: "{{ lxc_instance.name }} - {{ lxc_instance.hostname }}"

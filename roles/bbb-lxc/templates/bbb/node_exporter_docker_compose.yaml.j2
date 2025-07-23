@@ -1,9 +1,8 @@
-version: '3.2'
 services:
   {% if lxc_instance.install_bbb -%}
   bbb-exporter:
     container_name: bbb-exporter
-    image: greenstatic/bigbluebutton-exporter:v0.6.0
+    image: greenstatic/bigbluebutton-exporter:{{ bbb_lxc_node_exporter_version }}
     network_mode: host
     volumes:
       # Can be removed if `RECORDINGS_METRICS_READ_FROM_DISK` is set to false (or omitted).

@@ -36,6 +36,20 @@
     - 'lxc profile set {{ bbb_lxc_profile }} security.nesting=true'
   when: exists_lxd_profile.rc != 0
 
+# This is needed for docker to work within the LXC container in unprivileged mode.
+- name: Set sysctl kernel maxkeys settings
+  file:
+    path: /etc/sysctl.d/99-lxd.conf
+    content: >
+      kernel.keys.root_maxkeys=1000009
+      kernel.keys.maxkeys=1000009
+      kernel.keys.maxbytes=2000009
+      kernel.keys.root_maxbytes=25000009
+      fs.inotify.max_user_watches=100009
+
+- name: Apply sysctl values
+  comaand: 'sysctl -p'
+
 - include_tasks: create_shared_volume.yml
   when: bbb_lxc_storage_shared|length
 

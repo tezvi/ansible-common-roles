@@ -54,9 +54,14 @@
       lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_docker_compose.yaml
         {{ lxc_instance.name }}{{ bbb_lxc_node_exporter_dir }}/docker-compose.yaml
 
+  - name: '{{ lxc_instance.name }}: Remove previous prometheus node_exporter containers'
+    command:
+      cmd: "lxc exec {{ lxc_instance.name }} -- sh -c 'cd {{ bbb_lxc_node_exporter_dir }}; docker compose down --remove-orphans'"
+    ignore_errors: true
+
   - name: '{{ lxc_instance.name }}: Run docker prometheus node_exporter'
     command:
-      cmd: "lxc exec {{ lxc_instance.name }} -- sh -c 'cd {{ bbb_lxc_node_exporter_dir }}; docker-compose up -d --force-recreate'"
+      cmd: "lxc exec {{ lxc_instance.name }} -- sh -c 'cd {{ bbb_lxc_node_exporter_dir }}; docker compose up -d --force-recreate'"
 
   - fail:
       msg: "Password must not exceed limit of 8 characters, given {{ bbb_lxc_node_exporter_pass|length }} characters"
@@ -81,18 +86,11 @@
       lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_nginx_node_exporter.conf
         {{ lxc_instance.name }}{{ bbb_lxc_node_exporter_nginx_config }}
 
-  - name: '{{ lxc_instance.name }}: Detect nginx node_exporter include directive'
-    command:
-      cmd: 'lxc exec {{ lxc_instance.name }} -- grep {{ bbb_lxc_node_exporter_nginx_config }}; /etc/nginx/sites-available/bigbluebutton'
-    ignore_errors: true
-    register: bbb_lxc_node_exporter_nginx_stat
-
-  - name: '{{ lxc_instance.name }}: Add nginx node_exporter config include directive'
+  - name: '{{ lxc_instance.name }}: Add nginx node_exporter configuration'
     command:
       cmd: >-
         lxc exec {{ lxc_instance.name }} -- sh -c
-        "sed -i '/ssl_certificate \//i include {{ bbb_lxc_node_exporter_nginx_config }};\n' /etc/nginx/sites-available/bigbluebutton"
-    when: bbb_lxc_node_exporter_nginx_stat.rc != 0
+        "ln -sf {{ bbb_lxc_node_exporter_nginx_config }} /etc/bigbluebutton/nginx/metrics-node-exporter.nginx"
 
   - name: '{{ lxc_instance.name }}: Test nginx configuration'
     command: 'lxc exec {{ lxc_instance.name }} -- sh -c "nginx -T > /dev/null"'

@@ -1,8 +1,8 @@
 ---
-- include: install.yml
+- include_tasks: install.yml
 
-- include: install_oci8.yml
+- include_tasks: install_oci8.yml
   when: php_oci8_install|default(false)
 
-- include: configure.yml
+- include_tasks: configure.yml
 

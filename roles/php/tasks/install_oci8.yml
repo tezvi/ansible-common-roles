@@ -12,5 +12,5 @@
     path: "{{ extension_modules_dir }}/oci8.so"
   register: php_oci8_stat
 
-- include: compile_oci8.yml
+- include_tasks: compile_oci8.yml
   when: oracle_is_installed and not php_oci8_stat.stat.exists

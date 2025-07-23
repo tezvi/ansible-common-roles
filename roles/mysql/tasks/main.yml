@@ -1,7 +1,7 @@
 ---
-- include: install.yml
+- include_tasks: install.yml
 
-- include: configure.yml
+- include_tasks: configure.yml
 
-- include: setup_databases.yml
+- include_tasks: setup_databases.yml
   when: mysql_databases is defined and (mysql_databases|length>0)

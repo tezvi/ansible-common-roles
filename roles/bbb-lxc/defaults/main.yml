@@ -58,6 +58,9 @@ bbb_lxc_filebeat_clientcert: ''
 # Local private key file
 bbb_lxc_filebeat_clientkey: ''
 
+# Node exporter docker image version
+bbb_lxc_node_exporter_version: v0.7.1
+
 # Install prometheus node exporter, unless disabled on instance config
 bbb_lxc_install_node_exporter: true
 

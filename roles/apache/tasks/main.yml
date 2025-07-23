@@ -1,7 +1,7 @@
 ---
-- include: install.yml
+- include_tasks: install.yml
 
-- include: configure.yml
+- include_tasks: configure.yml
 
-- include: lets_encrypt.yml
+- include_tasks: lets_encrypt.yml
   when: install_letsencrypt|default(true)

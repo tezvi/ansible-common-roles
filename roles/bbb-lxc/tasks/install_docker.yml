@@ -31,15 +31,3 @@
     - 'update'
     - 'install docker-ce docker-ce-cli containerd.io -y'
 
-- command:
-    cmd: 'lxc exec {{ lxc_instance.name }} -- ls /usr/local/bin/docker-compose'
-  register: bbb_scalelite_docker_compose_exists
-  ignore_errors: true
-
-- name: '{{ lxc_instance.name }}: Install docker compose'
-  command:
-    cmd: "lxc exec {{ lxc_instance.name }} -- sh -c '{{ item }}'"
-  with_items:
-    - 'curl -L https://github.com/docker/compose/releases/download/1.28.5/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose'
-    - 'chmod +x /usr/local/bin/docker-compose'
-  when: bbb_scalelite_docker_compose_exists.rc != 0

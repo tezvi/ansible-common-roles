@@ -14,7 +14,7 @@
    lxc_instance_exists: "{{ exists_lxc_instance_stat is defined and exists_lxc_instance_stat.rc == 0 }}"
 
 - name: '{{ lxc_instance.name }}: Check container status'
-  shell: 'lxc ls {{ lxc_instance.name }} | grep STOPPED'
+  shell: 'lxc ls {{ lxc_instance.name }} | grep "{{ lxc_instance.name }}\ " | grep STOPPED'
   ignore_errors: true
   when: lxc_instance_exists
   register: lxc_instance_status
