@@ -1,8 +1,8 @@
 ---
-- include: install.yml
+- include_tasks: install.yml
 
-- include: configure.yml
+- include_tasks: configure.yml
 
-- include: configure_amavis.yml
+- include_tasks: configure_amavis.yml
 
-- include: spf_dkim.yml
+- include_tasks: spf_dkim.yml

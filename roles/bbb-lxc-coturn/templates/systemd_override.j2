@@ -7,6 +7,7 @@ ExecStart=/usr/bin/turnserver -c {{ bbb_lxc_coturn_config_file }} --pidfile {{ b
 Restart=always
 User=turnserver
 Group=turnserver
-Type=notify
+Type=simple
 InaccessibleDirectories=/home
 PrivateTmp=yes
+

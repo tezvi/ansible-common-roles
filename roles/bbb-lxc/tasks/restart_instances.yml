@@ -6,3 +6,4 @@
   when: lxc_instance.install_bbb|default(false)
   loop_control:
     loop_var: lxc_instance
+    label: "{{ lxc_instance.name }} - {{ lxc_instance.hostname }}"

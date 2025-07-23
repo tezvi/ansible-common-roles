@@ -1,7 +1,7 @@
 ---
-- include: is_installed.yml
+- include_tasks: is_installed.yml
 
-- include: install.yml
+- include_tasks: install.yml
   when: not oracle_client_stat.stat.exists and is_rhel
 
 - debug:
