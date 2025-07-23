@@ -58,6 +58,7 @@
         with_items:
           - 'exec {{ bbb_lxc_coturn.name }} -- mkdir -p /var/log/turnserver'
           - 'exec {{ bbb_lxc_coturn.name }} -- chown -R turnserver:turnserver /var/log/turnserver'
+          - 'exec {{ bbb_lxc_coturn.name }} -- chmod -R +rx /var/log/turnserver'
           - 'file push {{ bbb_lxc_coturn_tmp_dir }}/coturn_logrotate.conf {{ bbb_lxc_coturn.name }}/etc/logrotate.d/coturn'
 
       - name: 'Create run directory for pid file'
