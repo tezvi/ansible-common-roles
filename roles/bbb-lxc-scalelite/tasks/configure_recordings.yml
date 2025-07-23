@@ -19,17 +19,21 @@
         - 'mkdir -p {{ bbb_scalelite_recordings }}/published'
         - 'mkdir -p {{ bbb_scalelite_recordings }}/unpublished'
         - 'chown -R 1000:{{ bbb_scalelite_spool_gid }} {{ bbb_scalelite_recordings }}'
+        - 'chown -R 1000:{{ bbb_scalelite_spool_gid }} {{ bbb_scalelite_recordings_spool }}'
         - 'chmod -R g+rw {{ bbb_scalelite_recordings }}'
 
-    - name: Restart Scalelite Docker containers
-      command:
-        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "cd {{ bbb_scalelite_dir }}; docker compose down --remove-orphans; docker compose up -d"'
+    - name: Restart and test Scalelite containers
+      block:
+        - name: Restart Scalelite Docker containers
+          command:
+            cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "cd {{ bbb_scalelite_dir }}; docker compose down --remove-orphans; docker compose up -d"'
 
-    - name: Check if spool directory is writable by docker image
-      command: "lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c '{{ item }}'"
-      with_items:
-        - "docker exec scalelite-recording-importer touch /var/bigbluebutton/spool/test_{{ bbb_scalelite_lxc.name }}"
-        - "docker exec scalelite-recording-importer rm /var/bigbluebutton/spool/test_{{ bbb_scalelite_lxc.name }}"
+        - name: Check if spool directory is writable by docker image
+          command: "lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c '{{ item }}'"
+          with_items:
+            - "docker exec scalelite-recording-importer touch /var/bigbluebutton/spool/test_{{ bbb_scalelite_lxc.name }}"
+            - "docker exec scalelite-recording-importer rm /var/bigbluebutton/spool/test_{{ bbb_scalelite_lxc.name }}"
+      when: bbb_scalelite_restart_test|default(True)
 
     - name: Setup shared recordings for BBB instances
       include_tasks: setup_bbb_node_recordings.yml
