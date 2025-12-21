@@ -5,7 +5,8 @@
     command: 'lxc exec {{ lxc_instance.name }} -- sh -c "{{ item }}"'
     with_items:
       - 'wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -'
-      - 'apt-get install apt-transport-https'
+      - 'apt-get -y --fix-broken install || true'
+      - 'apt-get -y install apt-transport-https'
       - "echo 'deb https://artifacts.elastic.co/packages/7.x/apt stable main' > /etc/apt/sources.list.d/elastic-7.x.list"
 
   - name: '{{ lxc_instance.name }}: Install and configure Filebeat service'
@@ -83,11 +84,21 @@
       - src: system.yml
         dest: /etc/filebeat/modules.d/system.yml
 
+  - name: '{{ lxc_instance.name }}: Disable unused Filebeat modules to prevent warnings'
+    command: 'lxc exec {{ lxc_instance.name }} -- sh -c "filebeat modules disable {{ item }}"'
+    with_items:
+      - logstash
+      - kibana
+      - apache
+      - mysql
+      - elasticsearch
+    ignore_errors: yes
+
   - name: '{{ lxc_instance.name }}: Restart filebeat service'
     command: 'lxc exec {{ lxc_instance.name }} -- sh -c "{{ item }}"'
     with_items:
       - 'systemctl restart filebeat'
-      - 'sleep 5'
+      - 'sleep 10'
       - 'systemctl -q is-active filebeat'
 
   always:

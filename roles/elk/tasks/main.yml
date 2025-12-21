@@ -1,0 +1,37 @@
+---
+# Main tasks file for ELK SSL configuration
+
+- name: Include certificate generation tasks
+  include_tasks: generate_certs.yml
+  tags:
+    - elk
+    - elk-certs
+
+- name: Include Elasticsearch configuration tasks
+  include_tasks: configure_elasticsearch.yml
+  when: elk_elasticsearch_enabled | bool
+  tags:
+    - elk
+    - elk-elasticsearch
+
+- name: Include Logstash configuration tasks
+  include_tasks: configure_logstash.yml
+  when: elk_logstash_enabled | bool
+  tags:
+    - elk
+    - elk-logstash
+
+- name: Include client certificate distribution tasks
+  include_tasks: distribute_client_certs.yml
+  when: elk_distribute_client_certs | bool
+  tags:
+    - elk
+    - elk-distribute
+
+- name: Update local Filebeat certificates if installed
+  include_tasks: update_local_filebeat.yml
+  when: elk_distribute_client_certs | bool
+  tags:
+    - elk
+    - elk-filebeat
+

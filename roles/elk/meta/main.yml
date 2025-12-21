@@ -1,0 +1,32 @@
+---
+galaxy_info:
+  author: MEF Team
+  description: Configure SSL certificates for ELK (Elasticsearch, Logstash, Kibana) stack
+  company: MEF
+
+  license: MIT
+
+  min_ansible_version: 2.9
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: Debian
+      versions:
+        - buster
+        - bullseye
+
+  galaxy_tags:
+    - elk
+    - elasticsearch
+    - logstash
+    - ssl
+    - tls
+    - certificates
+    - filebeat
+    - security
+
+dependencies: []
+

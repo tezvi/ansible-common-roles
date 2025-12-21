@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+# Logstash Elasticsearch Output Configuration
+
+output {
+  elasticsearch {
+    # Local connection - no SSL or authentication needed
+    hosts => ["{{ elk_logstash_elasticsearch_host }}"]
+  }
+}
+

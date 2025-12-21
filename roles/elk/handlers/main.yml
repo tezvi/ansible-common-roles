@@ -1,0 +1,21 @@
+---
+# ELK handlers
+
+- name: restart elasticsearch
+  systemd:
+    name: elasticsearch
+    state: restarted
+  when: elk_restart_services | bool
+
+- name: restart logstash
+  systemd:
+    name: logstash
+    state: restarted
+  when: elk_restart_services | bool
+
+- name: restart filebeat
+  systemd:
+    name: filebeat
+    state: restarted
+  when: elk_restart_services | bool
+

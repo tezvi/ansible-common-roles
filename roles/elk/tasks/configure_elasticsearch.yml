@@ -1,0 +1,29 @@
+---
+# Configure Elasticsearch
+
+- name: Check if Elasticsearch is installed
+  command: systemctl list-unit-files elasticsearch.service
+  register: elasticsearch_installed
+  changed_when: false
+  failed_when: false
+
+- name: Configure Elasticsearch
+  block:
+    - name: Create Elasticsearch configuration from template
+      template:
+        src: elasticsearch.yml.j2
+        dest: /etc/elasticsearch/elasticsearch.yml
+        owner: root
+        group: elasticsearch
+        mode: '0660'
+        backup: yes
+      notify: restart elasticsearch
+
+    - name: Ensure Elasticsearch is enabled and started
+      systemd:
+        name: elasticsearch
+        enabled: yes
+        state: started
+
+  when: elasticsearch_installed.rc == 0
+

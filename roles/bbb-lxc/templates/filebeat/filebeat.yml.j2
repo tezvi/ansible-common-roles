@@ -49,13 +49,15 @@ filebeat.inputs:
   #  review: 1
 
 # ============================== Filebeat modules ==============================
+# Modules are disabled since we use custom inputs from inputs.d/*.yml
+# This prevents warnings about modules being loaded but not explicitly configured
 
-filebeat.config.modules:
+#filebeat.config.modules:
   # Glob pattern for configuration loading
-  path: ${path.config}/modules.d/*.yml
+  #path: ${path.config}/modules.d/*.yml
 
   # Set to true to enable config reloading
-  reload.enabled: false
+  #reload.enabled: false
 
   # Period on which files under path should be checked for changes
   #reload.period: 10s
@@ -239,6 +241,29 @@ logging.level: warning
 
 # This allows to enable 6.7 migration aliases
 #migration.6_to_7.enabled: true
+
+setup.ilm.enabled: false
+setup.ilm.rollover_alias: "filebeat"
+setup.ilm.pattern: "{now/d}-000001"
+setup.ilm.policy_name: "filebeat-policy"
+setup.ilm.check_exists: false
+setup.ilm.overwrite: true
+setup.template.enabled: false
+setup.dashboards.enabled: false
+
+
+# Configure ILM policy to delete indices after 30 days
+setup.ilm.policy:
+  phases:
+    hot:
+      actions:
+        rollover:
+          max_age: "7d"
+          max_size: "50gb"
+    delete:
+      min_age: "180d"
+      actions:
+        delete: {}
 
 filebeat.config.inputs:
   enabled: true

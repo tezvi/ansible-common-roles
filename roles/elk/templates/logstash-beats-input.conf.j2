@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# Logstash Beats Input Configuration
+
+input {
+  beats {
+    host => "0.0.0.0"
+    port => {{ elk_logstash_beats_port }}
+    ssl => true
+    ssl_certificate_authorities => ["{{ elk_logstash_certs_dir }}/ca/ca.crt"]
+    ssl_certificate => "{{ elk_logstash_certs_dir }}/logstash/server.crt"
+    ssl_key => "{{ elk_logstash_certs_dir }}/logstash/server.pkcs8.key"
+    ssl_verify_mode => "force_peer"
+  }
+}

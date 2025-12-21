@@ -1,0 +1,236 @@
+---
+# Generate SSL certificates for Logstash and Filebeat clients
+
+- name: Create staging directory for certificate generation
+  file:
+    path: "{{ elk_certs_staging_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Create Logstash certificates directory
+  file:
+    path: "{{ elk_logstash_certs_dir }}"
+    state: directory
+    mode: '0755'
+    owner: logstash
+    group: logstash
+
+- name: Create CA subdirectory in Logstash certs
+  file:
+    path: "{{ elk_logstash_certs_dir }}/ca"
+    state: directory
+    mode: '0755'
+    owner: logstash
+    group: logstash
+
+- name: Create Logstash subdirectory in Logstash certs
+  file:
+    path: "{{ elk_logstash_certs_dir }}/logstash"
+    state: directory
+    mode: '0755'
+    owner: logstash
+    group: logstash
+
+- name: Check if CA certificate already exists
+  stat:
+    path: "{{ elk_logstash_certs_dir }}/ca/ca.crt"
+  register: ca_cert_exists
+
+- name: Check if CA certificate is expired or expiring soon (within 30 days)
+  shell: openssl x509 -in {{ elk_logstash_certs_dir }}/ca/ca.crt -noout -checkend 2592000
+  register: ca_cert_valid
+  failed_when: false
+  changed_when: false
+  when: ca_cert_exists.stat.exists
+
+- name: Set fact if certificates need regeneration
+  set_fact:
+    regenerate_certs: "{{ not ca_cert_exists.stat.exists or (ca_cert_exists.stat.exists and ca_cert_valid.rc != 0) }}"
+
+- name: Display certificate status
+  debug:
+    msg: >
+      CA exists: {{ ca_cert_exists.stat.exists }}, 
+      Valid: {{ 'yes' if (ca_cert_exists.stat.exists and ca_cert_valid.rc == 0) else 'no' }},
+      Will regenerate: {{ regenerate_certs }}
+
+- name: Generate CA private key
+  command: >
+    openssl req -x509
+    -newkey rsa:4096
+    -keyout {{ elk_certs_staging_dir }}/ca.key
+    -out {{ elk_certs_staging_dir }}/ca.crt
+    -days {{ elk_cert_validity_days }}
+    -nodes
+    -subj "/CN={{ elk_cert_ca_cn }}/O={{ elk_cert_organization }}/C={{ elk_cert_country }}"
+  when: regenerate_certs
+
+- name: Generate Logstash server private key and CSR
+  command: >
+    openssl req -new
+    -newkey rsa:4096
+    -keyout {{ elk_certs_staging_dir }}/server.key
+    -out {{ elk_certs_staging_dir }}/server.csr
+    -nodes
+    -subj "/CN={{ elk_logstash_hostname }}/O={{ elk_cert_organization }}/C={{ elk_cert_country }}"
+  when: regenerate_certs
+
+- name: Create SAN extension file for server certificate
+  copy:
+    dest: "{{ elk_certs_staging_dir }}/server_san.ext"
+    content: |
+      subjectAltName = DNS:{{ elk_logstash_hostname }},DNS:localhost,IP:127.0.0.1
+      extendedKeyUsage = serverAuth,clientAuth
+    mode: '0644'
+  when: regenerate_certs
+
+- name: Sign Logstash server certificate with CA and SAN
+  command: >
+    openssl x509 -req
+    -in {{ elk_certs_staging_dir }}/server.csr
+    -CA {{ elk_certs_staging_dir }}/ca.crt
+    -CAkey {{ elk_certs_staging_dir }}/ca.key
+    -CAcreateserial
+    -out {{ elk_certs_staging_dir }}/server.crt
+    -days {{ elk_cert_validity_days }}
+    -sha256
+    -extfile {{ elk_certs_staging_dir }}/server_san.ext
+  when: regenerate_certs
+
+- name: Convert Logstash server key to PKCS8 format
+  command: >
+    openssl pkcs8 -topk8 -inform PEM -outform PEM
+    -in {{ elk_certs_staging_dir }}/server.key
+    -out {{ elk_certs_staging_dir }}/server.pkcs8.key
+    -nocrypt
+  when: regenerate_certs
+
+
+- name: Copy CA certificates to subdirectory
+  copy:
+    src: "{{ elk_certs_staging_dir }}/{{ item }}"
+    dest: "{{ elk_logstash_certs_dir }}/ca/{{ item }}"
+    owner: logstash
+    group: logstash
+    mode: '0640'
+    remote_src: yes
+  loop:
+    - ca.crt
+    - ca.key
+  when: regenerate_certs
+
+- name: Copy Logstash server certificates to subdirectory
+  copy:
+    src: "{{ elk_certs_staging_dir }}/{{ item }}"
+    dest: "{{ elk_logstash_certs_dir }}/logstash/{{ item }}"
+    owner: logstash
+    group: logstash
+    mode: '0640'
+    remote_src: yes
+  loop:
+    - server.crt
+    - server.pkcs8.key
+  when: regenerate_certs
+
+- name: Check if client certificates exist in logstash certs directory
+  stat:
+    path: "{{ elk_logstash_certs_dir }}/{{ item }}"
+  loop:
+    - client.crt
+    - client.key
+  register: client_certs_check
+
+- name: Set fact if client certificates need generation
+  set_fact:
+    generate_client_certs: "{{ regenerate_certs or not client_certs_check.results[0].stat.exists or not client_certs_check.results[1].stat.exists }}"
+
+- name: Generate and copy client certificates if needed
+  block:
+    - name: Copy CA certs to staging if CA exists but client certs don't
+      copy:
+        src: "{{ elk_logstash_certs_dir }}/ca/{{ item }}"
+        dest: "{{ elk_certs_staging_dir }}/{{ item }}"
+        remote_src: yes
+      loop:
+        - ca.crt
+        - ca.key
+      when: not regenerate_certs
+
+    - name: Generate Filebeat client private key and CSR
+      command: >
+        openssl req -new
+        -newkey rsa:4096
+        -keyout {{ elk_certs_staging_dir }}/client.key
+        -out {{ elk_certs_staging_dir }}/client.csr
+        -nodes
+        -subj "/CN=filebeat-client/O={{ elk_cert_organization }}/C={{ elk_cert_country }}"
+
+    - name: Create SAN extension file for client certificate
+      copy:
+        dest: "{{ elk_certs_staging_dir }}/client_san.ext"
+        content: |
+          subjectAltName = DNS:filebeat-client,DNS:localhost
+          extendedKeyUsage = clientAuth
+        mode: '0644'
+
+    - name: Sign Filebeat client certificate with CA and SAN
+      command: >
+        openssl x509 -req
+        -in {{ elk_certs_staging_dir }}/client.csr
+        -CA {{ elk_certs_staging_dir }}/ca.crt
+        -CAkey {{ elk_certs_staging_dir }}/ca.key
+        -CAcreateserial
+        -out {{ elk_certs_staging_dir }}/client.crt
+        -days {{ elk_cert_validity_days }}
+        -sha256
+        -extfile {{ elk_certs_staging_dir }}/client_san.ext
+
+    - name: Copy client certificates to Logstash certs directory
+      copy:
+        src: "{{ elk_certs_staging_dir }}/{{ item }}"
+        dest: "{{ elk_logstash_certs_dir }}/{{ item }}"
+        owner: logstash
+        group: logstash
+        mode: '0640'
+        remote_src: yes
+      loop:
+        - client.crt
+        - client.key
+
+    - name: Also copy CA certificate to root for easy distribution
+      copy:
+        src: "{{ elk_certs_staging_dir }}/ca.crt"
+        dest: "{{ elk_logstash_certs_dir }}/ca.crt"
+        owner: logstash
+        group: logstash
+        mode: '0640'
+        remote_src: yes
+
+    - name: Remove client CSR and extension files
+      file:
+        path: "{{ elk_certs_staging_dir }}/{{ item }}"
+        state: absent
+      loop:
+        - client.csr
+        - client_san.ext
+
+  when: generate_client_certs
+
+- name: Remove CSR and temporary key files
+  file:
+    path: "{{ elk_certs_staging_dir }}/{{ item }}"
+    state: absent
+  loop:
+    - server.csr
+    - server.key
+    - server_san.ext
+
+- name: Display certificate information
+  command: openssl x509 -in {{ elk_logstash_certs_dir }}/ca/ca.crt -noout -dates
+  register: cert_info
+  changed_when: false
+
+- name: Show CA certificate validity
+  debug:
+    msg: "{{ cert_info.stdout_lines }}"
+

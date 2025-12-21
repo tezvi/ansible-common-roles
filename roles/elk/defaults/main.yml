@@ -1,0 +1,46 @@
+---
+# ELK SSL Configuration Defaults
+
+# Certificate validity in days (5 years)
+elk_cert_validity_days: 1825
+
+# Certificate directories
+elk_certs_staging_dir: /etc/elasticsearch/certs/staging
+elk_elasticsearch_certs_dir: /etc/elasticsearch/certs
+elk_logstash_certs_dir: /etc/logstash/certs
+
+# Certificate subject information
+elk_cert_country: "UK"
+elk_cert_organization: "Example"
+elk_cert_ca_cn: "Logstash CA"
+
+# Logstash server hostname (should be the FQDN)
+elk_logstash_hostname: "{{ ansible_fqdn }}"
+
+# Elasticsearch configuration
+elk_elasticsearch_enabled: true
+elk_elasticsearch_cluster_name: "mef-lms-elastic"
+elk_elasticsearch_node_name: "{{ ansible_fqdn }}"
+elk_elasticsearch_network_host: "127.0.0.1"
+elk_elasticsearch_http_port: 9200
+elk_elasticsearch_disable_security: true
+
+# Logstash configuration
+elk_logstash_enabled: true
+elk_logstash_beats_port: 5044
+elk_logstash_elasticsearch_host: "http://localhost:9200"
+
+# Filebeat client certificates distribution
+elk_distribute_client_certs: false
+elk_client_certs_tmp_dir: /tmp
+
+# Service management
+elk_restart_services: true
+
+# Filebeat modules configuration
+# List of Filebeat modules to enable (empty by default, modules disabled)
+# Example: ['system', 'nginx']
+elk_filebeat_enabled_modules:
+  - system
+  - nginx
+

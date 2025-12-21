@@ -1,0 +1,37 @@
+---
+# Update local Filebeat certificates if Filebeat is installed on the ELK server
+
+- name: Check if Filebeat is installed on this server
+  stat:
+    path: /etc/filebeat
+  register: filebeat_installed
+
+- name: Create Filebeat certificates directory if it doesn't exist
+  file:
+    path: /etc/filebeat/certs
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  when: filebeat_installed.stat.exists and filebeat_installed.stat.isdir
+
+- name: Copy new certificates to Filebeat directory
+  copy:
+    src: "{{ elk_client_certs_tmp_dir }}/{{ item }}"
+    dest: "/etc/filebeat/certs/{{ item }}"
+    mode: '0644'
+    owner: root
+    group: root
+    remote_src: yes
+  loop:
+    - ca.crt
+    - client.crt
+    - client.key
+  when: filebeat_installed.stat.exists and filebeat_installed.stat.isdir
+  notify: restart filebeat
+
+- name: Display Filebeat certificate update message
+  debug:
+    msg: "Filebeat certificates updated on ELK server. Filebeat will be restarted."
+  when: filebeat_installed.stat.exists and filebeat_installed.stat.isdir
+

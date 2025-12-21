@@ -1,0 +1,52 @@
+---
+# Example playbook for configuring ELK with SSL
+# This playbook configures Elasticsearch and Logstash with SSL certificates
+#
+# Host-specific variables are defined in inventory/host_vars/node20.bbb2.lms.mef.hr.yml
+
+- name: Configure ELK Stack with SSL
+  hosts: elk_server
+  become: yes
+
+  roles:
+    - elk
+
+  post_tasks:
+    - name: Display next steps
+      debug:
+        msg: |
+          
+          ========================================
+          ELK SSL Configuration Complete!
+          ========================================
+          
+          Client certificates for Filebeat servers are available at:
+          - /tmp/ca.crt
+          - /tmp/client.crt
+          - /tmp/client.key
+          
+          Certificate directory structure on ELK server:
+          /etc/logstash/certs/
+          ├── ca/
+          │   ├── ca.crt
+          │   └── ca.key
+          ├── logstash/
+          │   ├── server.crt
+          │   └── server.pkcs8.key
+          ├── client.crt
+          └── client.key
+          
+          Next steps:
+          1. Copy these certificates to each Filebeat server
+          2. Place them in /etc/filebeat/certs/
+          3. Ensure Filebeat configuration uses SSL with these certificates
+          4. Restart Filebeat on each server
+          
+          To verify certificates:
+            openssl x509 -in /etc/logstash/certs/ca/ca.crt -noout -dates
+          
+          To test Logstash configuration:
+            /usr/share/logstash/bin/logstash --config.test_and_exit -f /etc/logstash/conf.d/
+          
+          ========================================
+

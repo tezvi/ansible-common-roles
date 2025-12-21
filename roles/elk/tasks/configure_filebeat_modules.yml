@@ -1,0 +1,34 @@
+---
+# Disable unused Filebeat modules to prevent warnings
+
+- name: Check if Filebeat modules directory exists
+  stat:
+    path: /etc/filebeat/modules.d
+  register: filebeat_modules_dir
+
+- name: Disable default Filebeat modules that are not needed
+  command: filebeat modules disable {{ item }}
+  loop:
+    - logstash
+    - kibana
+    - nginx
+    - apache
+    - mysql
+    - elasticsearch
+    - system
+  when:
+    - filebeat_modules_dir.stat.exists
+    - filebeat_modules_dir.stat.isdir
+  ignore_errors: yes
+  become: yes
+
+- name: Enable only required Filebeat modules (if any)
+  command: filebeat modules enable {{ item }}
+  loop: "{{ elk_filebeat_enabled_modules | default([]) }}"
+  when:
+    - filebeat_modules_dir.stat.exists
+    - filebeat_modules_dir.stat.isdir
+    - elk_filebeat_enabled_modules is defined
+    - elk_filebeat_enabled_modules | length > 0
+  become: yes
+

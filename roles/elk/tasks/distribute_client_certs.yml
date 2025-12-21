@@ -1,0 +1,75 @@
+---
+# Distribute client certificates for Filebeat servers
+
+- name: Ensure CA certificate is available in root certs directory for distribution
+  copy:
+    src: "{{ elk_logstash_certs_dir }}/ca/ca.crt"
+    dest: "{{ elk_logstash_certs_dir }}/ca.crt"
+    owner: logstash
+    group: logstash
+    mode: '0640'
+    remote_src: yes
+
+- name: Check if client certificates exist in staging directory
+  stat:
+    path: "{{ elk_certs_staging_dir }}/{{ item }}"
+  loop:
+    - client.crt
+    - client.key
+  register: staging_client_certs
+
+- name: Debug - Show staging cert status
+  debug:
+    msg: "{{ item.item }}: exists={{ item.stat.exists }}, path={{ elk_certs_staging_dir }}/{{ item.item }}"
+  loop: "{{ staging_client_certs.results }}"
+
+- name: Copy client certificates from staging to root certs directory
+  copy:
+    src: "{{ elk_certs_staging_dir }}/{{ item.item }}"
+    dest: "{{ elk_logstash_certs_dir }}/{{ item.item }}"
+    owner: logstash
+    group: logstash
+    mode: '0640'
+    remote_src: yes
+  loop: "{{ staging_client_certs.results }}"
+  when: item.stat.exists
+
+- name: Check if client certificates now exist in logstash certs directory
+  stat:
+    path: "{{ elk_logstash_certs_dir }}/{{ item }}"
+  loop:
+    - client.crt
+    - client.key
+  register: logstash_client_certs
+
+- name: Debug - Show logstash cert status
+  debug:
+    msg: "{{ item.item }}: exists={{ item.stat.exists }}"
+  loop: "{{ logstash_client_certs.results }}"
+
+- name: Copy client certificates to temporary directory for distribution
+  copy:
+    src: "{{ elk_logstash_certs_dir }}/{{ item.item }}"
+    dest: "{{ elk_client_certs_tmp_dir }}/{{ item.item }}"
+    mode: '0644'
+    remote_src: yes
+  loop: "{{ logstash_client_certs.results }}"
+  when: item.stat.exists
+
+- name: Copy CA certificate to temporary directory for distribution
+  copy:
+    src: "{{ elk_logstash_certs_dir }}/ca.crt"
+    dest: "{{ elk_client_certs_tmp_dir }}/ca.crt"
+    mode: '0644'
+    remote_src: yes
+
+- name: Display information about certificate distribution
+  debug:
+    msg: |
+      Client certificates are ready for distribution at:
+      - {{ elk_client_certs_tmp_dir }}/ca.crt
+      - {{ elk_client_certs_tmp_dir }}/client.crt (if exists)
+      - {{ elk_client_certs_tmp_dir }}/client.key (if exists)
+      
+      Copy these files to your Filebeat servers at /etc/filebeat/certs/
+
