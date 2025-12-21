@@ -1,4 +1,5 @@
 *.retry
 inventory/**/*.yml
 inventory/hosts
-ansible.log
+ansible.log!
+/inventory/hosts.ini
