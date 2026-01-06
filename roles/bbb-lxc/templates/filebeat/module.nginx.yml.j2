@@ -11,7 +11,7 @@
     # Filebeat will choose the paths depending on your OS.
     var.paths:
       - /var/log/nginx/*access.log
-      {% if lxc_instance.name == bbb_scalelite_lxc.name -%}
+      {% if bbb_scalelite_lxc is defined and lxc_instance.name == bbb_scalelite_lxc.name -%}
       - /opt/scalelite-run/log/proxy-nginx/access.log
       - /opt/scalelite-run/log/recordings/access.log
       {% endif %}
@@ -24,7 +24,7 @@
     # Filebeat will choose the paths depending on your OS.
     var.paths:
       - /var/log/nginx/*-error.log
-      {% if lxc_instance.name == bbb_scalelite_lxc.name -%}
+      {% if bbb_scalelite_lxc is defined and lxc_instance.name == bbb_scalelite_lxc.name -%}
       - /opt/scalelite-run/log/proxy-nginx/error.log
       - /opt/scalelite-run/log/recordings/error.log
       {% endif %}

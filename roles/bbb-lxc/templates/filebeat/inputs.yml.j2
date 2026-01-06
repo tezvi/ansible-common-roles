@@ -1,5 +1,5 @@
 # {{ ansible_managed }}
-{% if lxc_instance.install_bbb %}
+{% if lxc_instance.install_bbb|default(false) %}
 ### Bigbluebutton logs ###
 - type: filestream
   id: bigbluebutton-logs
@@ -121,8 +121,12 @@
     - /var/log/lxd/*.log
     - /var/log/grafana/*.log
     - /var/log/filebeat/filebeat
+    - /var/log/freeradius/*.log
+    - /var/log/carnet-upgrade.log
+    - /opt/otrs/var/log/*.log
+    - /opt/otrs/var/log/Daemon/*.log
 
-  {% if bbb_lxc_filebeat_include_pattern -%}
+  {% if bbb_lxc_filebeat_include_pattern|default(false) -%}
   include_lines: ['{{ bbb_lxc_filebeat_include_pattern }}']
   {% endif %}
 

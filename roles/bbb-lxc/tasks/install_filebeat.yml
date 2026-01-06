@@ -1,10 +1,19 @@
 ---
 
 - block:
+  - name: '{{ lxc_instance.name }}: Check if sudo is available'
+    command: 'lxc exec {{ lxc_instance.name }} -- sh -c "command -v sudo"'
+    register: sudo_check
+    ignore_errors: yes
+    changed_when: false
+
+  - set_fact:
+      sudo_prefix: "{{ 'sudo ' if sudo_check.rc == 0 else '' }}"
+
   - name: '{{ lxc_instance.name }}: Configure Filebeat apt repository'
     command: 'lxc exec {{ lxc_instance.name }} -- sh -c "{{ item }}"'
     with_items:
-      - 'wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -'
+      - 'wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | {{ sudo_prefix }}apt-key add -'
       - 'apt-get -y --fix-broken install || true'
       - 'apt-get -y install apt-transport-https'
       - "echo 'deb https://artifacts.elastic.co/packages/7.x/apt stable main' > /etc/apt/sources.list.d/elastic-7.x.list"

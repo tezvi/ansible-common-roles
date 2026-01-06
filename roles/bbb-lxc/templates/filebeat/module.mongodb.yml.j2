@@ -5,7 +5,7 @@
 - module: mongodb
   # All logs
   log:
-    enabled: {{ 'true' if lxc_instance.install_bbb else 'false' }}
+    enabled: {{ 'true' if lxc_instance.install_bbb|default(false) else 'false' }}
 
     # Set custom paths for the log files. If left empty,
     # Filebeat will choose the paths depending on your OS.
