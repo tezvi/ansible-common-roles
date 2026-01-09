@@ -48,7 +48,7 @@
       fs.inotify.max_user_watches=100009
 
 - name: Apply sysctl values
-  comaand: 'sysctl -p'
+  command: 'sysctl -p'
 
 - include_tasks: create_shared_volume.yml
   when: bbb_lxc_storage_shared|length

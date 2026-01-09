@@ -1,6 +1,6 @@
 ---
 # URL path to official BBB bash install script
-bbb_lxc_bbb_install_url: 'https://raw.githubusercontent.com/bigbluebutton/bbb-install/v2.7.x-release/bbb-install.sh'
+bbb_lxc_bbb_install_url: 'https://raw.githubusercontent.com/bigbluebutton/bbb-install/refs/heads/v3.0.x-release/bbb-install.sh'
 # If set BBB will automatically redirect user to this url for default document root
 bbb_lxc_bbb_redirect_url:
 # Path of index file for default document root
@@ -20,6 +20,8 @@ bbb_lxc_net_bridged: true
 bbb_lxc_force_bbb_install: false
 # Adjust CPU and scheduling policy for systemd units to prevent errors when running in LXC
 bbb_systemd_containerize_units: true
+# Disable AppArmor for LXC containers (set to true if you encounter AppArmor conflicts)
+bbb_lxc_disable_apparmor: false
 # Temporary directory to use on host OS for template processing
 bbb_lxc_tmp_dir: /tmp
 # If true recordings will be processed only out of working hours
@@ -64,8 +66,26 @@ bbb_lxc_node_exporter_version: v0.7.1
 # Install prometheus node exporter, unless disabled on instance config
 bbb_lxc_install_node_exporter: true
 
+# Use Docker Compose for node exporter installation instead of systemd units
+bbb_lxc_node_exporter_from_docker: false
+
 # BBB node exporter docker directory
 bbb_lxc_node_exporter_dir: /opt/bbb_node_exporter
+
+# Systemd installation URLs (used when bbb_lxc_node_exporter_from_docker is false)
+# Prometheus Node Exporter binary version and URL
+bbb_lxc_node_exporter_binary_version: '1.10.2'
+bbb_lxc_node_exporter_binary_url: 'https://github.com/prometheus/node_exporter/releases/download/v{{ bbb_lxc_node_exporter_binary_version }}/node_exporter-{{ bbb_lxc_node_exporter_binary_version }}.linux-amd64.tar.gz'
+
+# BBB Exporter - Python-based installation (uses bbb_lxc_node_exporter_version variable for version/tag)
+bbb_lxc_bbb_exporter_git_repo: 'https://github.com/greenstatic/bigbluebutton-exporter.git'
+bbb_lxc_bbb_exporter_install_dir: '/opt/bigbluebutton-exporter'
+bbb_lxc_bbb_exporter_config_dir: '/etc/bigbluebutton-exporter'
+bbb_lxc_bbb_exporter_user: 'bbb-exporter'
+bbb_lxc_bbb_exporter_systemd_source: '/opt/bigbluebutton-exporter/extras/systemd'
+
+# Netdata installation script URL
+bbb_lxc_netdata_install_url: 'https://get.netdata.cloud/kickstart.sh'
 
 # BBB node exporter nginx config file
 bbb_lxc_node_exporter_nginx_config: '{{ bbb_lxc_node_exporter_dir}}/nginx_prometheus_node_exporter.conf'

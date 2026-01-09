@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Real time performance monitoring
+After=network.target
+
+[Service]
+Type=simple
+User=netdata
+Group=netdata
+Environment="DO_NOT_TRACK=1"
+ExecStart=/usr/sbin/netdata -D
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+

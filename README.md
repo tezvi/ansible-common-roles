@@ -270,11 +270,12 @@ Available variables:
 ```yaml
 ---
 # URL path to official BBB bash install script
-bbb_lxc_bbb_install_url: 'https://ubuntu.bigbluebutton.org/bbb-install.sh'
+bbb_lxc_bbb_install_url: 'https://raw.githubusercontent.com/bigbluebutton/bbb-install/refs/heads/v3.0.x-release/bbb-install.sh'
 # If set BBB will automatically redirect user to this url for default document root
 bbb_lxc_bbb_redirect_url:
 # Path of index file for default document root
-bbb_lxc_bbb_index_file: '/var/www/bigbluebutton-default/index.html'
+# For BBB lower than v2.4: bbb_lxc_bbb_index_file: '/var/www/bigbluebutton-default/index.html'
+bbb_lxc_bbb_index_file: '/var/www/bigbluebutton-default/assets/index.html'
 # Path to BBB properties file
 bbb_lxc_bbb_properties_file: '/usr/share/bbb-web/WEB-INF/classes/bigbluebutton.properties'
 # Path to Freeswitch configuration
@@ -282,15 +283,19 @@ bbb_lxc_bbb_freeswitch_config_file: '/opt/freeswitch/etc/freeswitch/vars.xml'
 # Target systemd unit directory
 bbb_lxc_systemd_unit_dir: '/usr/lib/systemd/system'
 # Path to HTML5 systemd unit file
-bbb_lxc_bbb_html5unit_file: '/usr/lib/systemd/system/bbb-html5.service'
+bbb_lxc_bbb_html5unit_file: '{{ bbb_lxc_systemd_unit_dir }}/bbb-html5.service'
 # If true container will be configured for local network
 bbb_lxc_net_bridged: true
 # If true role will force BBB install script even if BBB has already been installed
 bbb_lxc_force_bbb_install: false
+# Adjust CPU and scheduling policy for systemd units to prevent errors when running in LXC
+bbb_systemd_containerize_units: true
+# Disable AppArmor for LXC containers (set to true if you encounter AppArmor conflicts)
+bbb_lxc_disable_apparmor: false
 # Temporary directory to use on host OS for template processing
 bbb_lxc_tmp_dir: /tmp
 # If true recordings will be processed only out of working hours
-bbb_lxc_recording_timer_enabled: true
+bbb_lxc_recording_timer_enabled: false
 # Path to recording timer file for systemd scheduling
 bbb_lxc_recording_timer_file: /etc/systemd/system/bbb-record-core.timer.d/override.conf
 # If true multiple kurentos instances will be configured via BBB install script
@@ -313,26 +318,52 @@ bbb_lxc_install_filebeat: true
 # Logstash URL that will be used as Filebeat output
 bbb_lxc_filebeat_logstash_url:
 # Default Filebeat input include_lines pattern
-bbb_lxc_filebeat_include_pattern: '(ERR|WARN|error|warn|warning|critical|urgent|fail)'
+bbb_lxc_filebeat_include_pattern: '(ERR|WARN|error|warn|warning|critical|urgent|fail|exception)'
 # Default Filebeat certificates directory
 bbb_lxc_filebeat_cert_dir: /etc/filebeat/certs
-# Local CA certificate file, more info on how to setup certs can be found here
+# Local CA certificate file
+# More info on how to setup certs for logstash can be found here (you can use same tutorial for filebeat client certs)
 # https://kifarunix.com/easy-way-to-configure-filebeat-logstash-ssl-tls-connection/
-bbb_lxc_filebeat_cacert: '{{ playbook_dir }}/../files/bbb/filebeat_ca.crt'
+bbb_lxc_filebeat_cacert: ''
 # Local Certificate file
-bbb_lxc_filebeat_clientcert: '{{ playbook_dir }}/../files/bbb/filebeat_client.crt'
+bbb_lxc_filebeat_clientcert: ''
 # Local private key file
-bbb_lxc_filebeat_clientkey: '{{ playbook_dir }}/../files/bbb/filebeat_client.key'
+bbb_lxc_filebeat_clientkey: ''
 
-# Install prometheus node exporter
+# Node exporter docker image version (used for Docker Compose and Git tag for systemd installation)
+bbb_lxc_node_exporter_version: v0.7.1
+
+# Install prometheus node exporter, unless disabled on instance config
 bbb_lxc_install_node_exporter: true
+
+# Use Docker Compose for node exporter installation instead of systemd units
+bbb_lxc_node_exporter_from_docker: false
+
 # BBB node exporter docker directory
 bbb_lxc_node_exporter_dir: /opt/bbb_node_exporter
+
+# Systemd installation URLs (used when bbb_lxc_node_exporter_from_docker is false)
+# Prometheus Node Exporter binary version and URL
+bbb_lxc_node_exporter_binary_version: '1.10.2'
+bbb_lxc_node_exporter_binary_url: 'https://github.com/prometheus/node_exporter/releases/download/v{{ bbb_lxc_node_exporter_binary_version }}/node_exporter-{{ bbb_lxc_node_exporter_binary_version }}.linux-amd64.tar.gz'
+
+# BBB Exporter - Python-based installation (uses bbb_lxc_node_exporter_version variable for version/tag)
+bbb_lxc_bbb_exporter_git_repo: 'https://github.com/greenstatic/bigbluebutton-exporter.git'
+bbb_lxc_bbb_exporter_install_dir: '/opt/bigbluebutton-exporter'
+bbb_lxc_bbb_exporter_config_dir: '/etc/bigbluebutton-exporter'
+bbb_lxc_bbb_exporter_user: 'bbb-exporter'
+bbb_lxc_bbb_exporter_systemd_source: '/opt/bigbluebutton-exporter/extras/systemd'
+
+# Netdata installation script URL
+bbb_lxc_netdata_install_url: 'https://get.netdata.cloud/kickstart.sh'
+
 # BBB node exporter nginx config file
 bbb_lxc_node_exporter_nginx_config: '{{ bbb_lxc_node_exporter_dir}}/nginx_prometheus_node_exporter.conf'
+
 # Username and password for Prometheus HTTP authentication
 bbb_lxc_node_exporter_user: bbb_prometheus
 bbb_lxc_node_exporter_pass:
+
 # Limit node_exporter nginx proxy to allow only requests from this ip address
 bbb_lxc_node_exporter_ip_address:
 
@@ -340,8 +371,10 @@ bbb_lxc_node_exporter_ip_address:
 bbb_lxc_turn_server:
 # Turn/turns server secret
 bbb_lxc_turn_secret:
+# Path to BBB stun-turn configuration file
+bbb_lxc_turn_config_file: /usr/share/bbb-web/WEB-INF/classes/spring/turn-stun-servers.xml
   
-# List of default yum packages to install on BBB LXC instance
+# List of default packages to install on BBB LXC instance
 bbb_lxc_default_packages:
   - vim
   - git
@@ -371,6 +404,8 @@ bbb_lxc_instances: []
 #    profile:
 #    image:
 #    install_node_exporter:
+#    node_exporter_from_docker: false  # Override global setting per instance
+#    disable_apparmor: false  # Override global setting per instance
 ```
 
 ### BigBlueButton Scalelite (bbb-lxc-scalelite)
@@ -497,9 +532,9 @@ Installs webkit based PDF renderer engine.
         mysql_root_password: password
         mysql_databases:
           - database: dbname
-           user: user
-           password: password
-           dump_file: filepath
+            user: user
+            password: password
+            dump_file: filepath
     - role: mediawiki-parsoid
       vars:
         parsoid_uri: "http://www.{{ http_domain_name }}/w/api.php"

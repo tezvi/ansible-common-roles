@@ -124,24 +124,43 @@
       until: stat_container_internet is not failed
 
     - name: '{{ lxc_instance.name }}: Update installed apt packages and cache'
-      command:
-        cmd: "lxc exec {{ lxc_instance.name }} -- sh -c 'sleep 10 && {{ item }}'"
-      with_items:
-        - 'dpkg --configure -a'
-        - 'apt-get update -y'
-        - 'apt-get upgrade -y --force-yes'
-        - 'apt-get autoremove -y --force-yes'
+      shell: |
+        lxc exec {{ lxc_instance.name }} -- sh -c '
+          sleep 10
+          export DEBIAN_FRONTEND=noninteractive
+          dpkg --configure -a
+          apt-get update -y
+          apt-get upgrade -y --force-yes
+          apt-get autoremove -y --force-yes
+        '
       become: true
       # apt tasks can have locks acquired from other processes, retry several times before giving up.
       retries: 3
-      delay: 60
+      delay: 30
       register: stat_apt_commands
-      until: stat_apt_commands is not failed
+      async: 900
+      poll: 10
 
     - name: '{{ lxc_instance.name }}: Install default tools and utilities'
       command:
-        cmd: "lxc exec {{ lxc_instance.name }} -- apt-get install {{ item }} -y"
-      with_items: "{{ bbb_lxc_default_packages }}"
+        cmd: "lxc exec {{ lxc_instance.name }} -- sh -c 'DEBIAN_FRONTEND=noninteractive apt-get install {{ bbb_lxc_default_packages | join(' ') }} -y'"
+
+    - name: '{{ lxc_instance.name }}: Wait for snapd to be fully seeded'
+      shell: "lxc exec {{ lxc_instance.name }} -- sh -c 'systemctl is-active snapd.seeded.service 2>&1'"
+      register: snapd_seed_check
+      retries: 30
+      delay: 5
+      until: snapd_seed_check.rc == 0 or "active" in snapd_seed_check.stdout
+      ignore_errors: true
+
+    - name: '{{ lxc_instance.name }}: Install yq v4 from snap'
+      command:
+        cmd: "lxc exec {{ lxc_instance.name }} -- snap install yq"
+      register: yq_install_result
+      when: snapd_seed_check is succeeded or "active" in snapd_seed_check.stdout
+      failed_when:
+        - yq_install_result.rc != 0
+        - '"already installed" not in yq_install_result.stderr'
 
     - name: '{{ lxc_instance.name }}: Configure global git user'
       command:
@@ -150,8 +169,6 @@
         - 'user.name "{{ lxc_instance.name }}"'
         - 'user.email "{{ lxc_instance.email }}"'
       when: "'git' in bbb_lxc_default_packages"
-
-    - import_tasks:  install_docker.yml
 
     - name: '{{ lxc_instance.name }}: Template shell LXC prompt script'
       template:

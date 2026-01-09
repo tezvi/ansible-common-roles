@@ -20,3 +20,5 @@
 - include_tasks: install_bbb_instances.yml
 
 - include_tasks: install_node_exporter_instances.yml
+
+- include_tasks: install_filebeat_instances.yml

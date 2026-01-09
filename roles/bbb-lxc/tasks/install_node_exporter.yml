@@ -13,59 +13,219 @@
   when: not bbb_instance_ready
   ignore_errors: true
 
+- set_fact:
+    use_docker_compose: '{{ lxc_instance.node_exporter_from_docker|default(bbb_lxc_node_exporter_from_docker)|bool }}'
+
 - block:
-  - name: '{{ lxc_instance.name }}: Create node_exporter directory'
-    command: 'lxc exec {{ lxc_instance.name }} -- mkdir -p {{ item }}'
-    with_items:
-      - '{{ bbb_lxc_node_exporter_dir }}'
-      - '{{ bbb_lxc_node_exporter_dir }}/netdataconfig'
-      - '{{ bbb_lxc_node_exporter_dir }}/netdatalib'
-      - '{{ bbb_lxc_node_exporter_dir }}/netdatacache'
+  # Docker Compose installation
+  - name: Docker Compose installation block
+    block:
+      - import_tasks: install_docker.yml
 
-  - name: '{{ lxc_instance.name }}: Render node_exporter docker-compose config'
-    template:
-      src: bbb/node_exporter_docker_compose.yaml.j2
-      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_docker_compose.yaml"
-      mode: 0644
+      - name: '{{ lxc_instance.name }}: Disable AppArmor for LXC container'
+        shell: |
+          printf "lxc.apparmor.profile = unconfined\nlxc.mount.entry = /dev/null sys/module/apparmor/parameters/enabled none bind 0 0" | \
+          lxc config set {{ lxc_instance.name }} raw.lxc -
+        when: lxc_instance.disable_apparmor|default(bbb_lxc_disable_apparmor)|bool
 
-  - block:
-      - command: 'lxc exec {{ lxc_instance.name }} -- bbb-conf --status'
-        register: bbb_instance_ready_stat
+      - name: '{{ lxc_instance.name }}: Restart LXC container to apply AppArmor changes'
+        command: 'lxc restart {{ lxc_instance.name }}'
+        when: lxc_instance.disable_apparmor|default(bbb_lxc_disable_apparmor)|bool
+
+      - name: '{{ lxc_instance.name }}: Create node_exporter directory'
+        command: 'lxc exec {{ lxc_instance.name }} -- mkdir -p {{ item }}'
+        with_items:
+          - '{{ bbb_lxc_node_exporter_dir }}'
+          - '{{ bbb_lxc_node_exporter_dir }}/netdataconfig'
+          - '{{ bbb_lxc_node_exporter_dir }}/netdatalib'
+          - '{{ bbb_lxc_node_exporter_dir }}/netdatacache'
+
+      - name: '{{ lxc_instance.name }}: Render node_exporter docker-compose config'
+        template:
+          src: bbb/node_exporter_docker_compose.yaml.j2
+          dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_docker_compose.yaml"
+          mode: 0644
+
+      - block:
+          - command: 'lxc exec {{ lxc_instance.name }} -- bbb-conf --status'
+            register: bbb_instance_ready_stat
+            ignore_errors: true
+
+          - command: 'lxc exec {{ lxc_instance.name }} -- sh -c "bbb-conf --secret | grep Secret: | cut -d: -f2"'
+            when: bbb_instance_ready_stat.rc is defined and bbb_instance_ready_stat.rc == 0
+            register: bbb_instance_secret_stat
+
+          - set_fact:
+              bbb_instance_secret: "{{ (bbb_instance_secret_stat.stdout if (bbb_instance_secret_stat.stdout is defined) else '')|trim }}"
+              bbb_instance_url: 'https://{{ lxc_instance.hostname }}/bigbluebutton/api/'
+
+          - name: '{{ lxc_instance.name }}: Deploy docker-composer secrets file'
+            command: lxc exec {{ lxc_instance.name }} -- sh -c '{{ item }} {{ bbb_lxc_node_exporter_dir }}/.env'
+            with_items:
+              - 'echo API_BASE_URL={{ bbb_instance_url }} >'
+              - 'echo API_SECRET={{ bbb_instance_secret }} >>'
+        when: lxc_instance.install_bbb
+
+      - name: '{{ lxc_instance.name }}: Deploy new docker-composer file'
+        command: >-
+          lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_docker_compose.yaml
+            {{ lxc_instance.name }}{{ bbb_lxc_node_exporter_dir }}/docker-compose.yaml
+
+      - name: '{{ lxc_instance.name }}: Remove previous prometheus node_exporter containers'
+        command:
+          cmd: "lxc exec {{ lxc_instance.name }} -- sh -c 'cd {{ bbb_lxc_node_exporter_dir }}; docker compose down --remove-orphans'"
         ignore_errors: true
 
-      - command: 'lxc exec {{ lxc_instance.name }} -- sh -c "bbb-conf --secret | grep Secret: | cut -d: -f2"'
-        when: bbb_instance_ready_stat.rc is defined and bbb_instance_ready_stat.rc == 0
-        register: bbb_instance_secret_stat
+      - name: '{{ lxc_instance.name }}: Run docker prometheus node_exporter'
+        command:
+          cmd: "lxc exec {{ lxc_instance.name }} -- sh -c 'cd {{ bbb_lxc_node_exporter_dir }}; docker compose up -d --force-recreate'"
+    when: use_docker_compose|bool
 
-      - set_fact:
-          bbb_instance_secret: "{{ (bbb_instance_secret_stat.stdout if (bbb_instance_secret_stat.stdout is defined) else '')|trim }}"
-          bbb_instance_url: 'https://{{ lxc_instance.hostname }}/bigbluebutton/api/'
+  # Systemd installation
+  - name: Systemd installation block
+    block:
+      - name: '{{ lxc_instance.name }}: Create installation directory'
+        command: 'lxc exec {{ lxc_instance.name }} -- mkdir -p /usr/local/bin'
 
-      - name: '{{ lxc_instance.name }}: Deploy docker-composer secrets file'
-        command: lxc exec {{ lxc_instance.name }} -- sh -c '{{ item }} {{ bbb_lxc_node_exporter_dir }}/.env'
-        with_items:
-          - 'echo API_BASE_URL={{ bbb_instance_url }} >'
-          - 'echo API_SECRET={{ bbb_instance_secret }} >>'
-    when: lxc_instance.install_bbb
+      - name: '{{ lxc_instance.name }}: Stop node_exporter service if running'
+        command: 'lxc exec {{ lxc_instance.name }} -- systemctl stop node_exporter'
+        ignore_errors: true
 
+      - name: '{{ lxc_instance.name }}: Download and install node_exporter binary'
+        command: >-
+          lxc exec {{ lxc_instance.name }} -- sh -c '
+          cd /tmp &&
+          wget -q {{ bbb_lxc_node_exporter_binary_url }} &&
+          tar xzf node_exporter-{{ bbb_lxc_node_exporter_binary_version }}.linux-amd64.tar.gz &&
+          cp node_exporter-{{ bbb_lxc_node_exporter_binary_version }}.linux-amd64/node_exporter /usr/local/bin/ &&
+          chmod +x /usr/local/bin/node_exporter &&
+          rm -rf node_exporter-{{ bbb_lxc_node_exporter_binary_version }}.linux-amd64*
+          '
 
-  - name: '{{ lxc_instance.name }}: Deploy new docker-composer file'
-    command: >-
-      lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_docker_compose.yaml
-        {{ lxc_instance.name }}{{ bbb_lxc_node_exporter_dir }}/docker-compose.yaml
+      - name: '{{ lxc_instance.name }}: Stop netdata service if running'
+        command: 'lxc exec {{ lxc_instance.name }} -- systemctl stop netdata'
+        ignore_errors: true
 
-  - name: '{{ lxc_instance.name }}: Remove previous prometheus node_exporter containers'
-    command:
-      cmd: "lxc exec {{ lxc_instance.name }} -- sh -c 'cd {{ bbb_lxc_node_exporter_dir }}; docker compose down --remove-orphans'"
-    ignore_errors: true
+      - name: '{{ lxc_instance.name }}: Download and install netdata'
+        command: >-
+          lxc exec {{ lxc_instance.name }} -- sh -c '
+          wget -O /tmp/netdata-kickstart.sh {{ bbb_lxc_netdata_install_url }} &&
+          sh /tmp/netdata-kickstart.sh --non-interactive --stable-channel --disable-telemetry &&
+          rm /tmp/netdata-kickstart.sh
+          '
 
-  - name: '{{ lxc_instance.name }}: Run docker prometheus node_exporter'
-    command:
-      cmd: "lxc exec {{ lxc_instance.name }} -- sh -c 'cd {{ bbb_lxc_node_exporter_dir }}; docker compose up -d --force-recreate'"
+      - block:
+          - command: 'lxc exec {{ lxc_instance.name }} -- bbb-conf --status'
+            register: bbb_instance_ready_stat
+            ignore_errors: true
+
+          - command: 'lxc exec {{ lxc_instance.name }} -- sh -c "bbb-conf --secret | grep Secret: | cut -d: -f2"'
+            when: bbb_instance_ready_stat.rc is defined and bbb_instance_ready_stat.rc == 0
+            register: bbb_instance_secret_stat
+
+          - set_fact:
+              bbb_instance_secret: "{{ (bbb_instance_secret_stat.stdout if (bbb_instance_secret_stat.stdout is defined) else '')|trim }}"
+              bbb_instance_url: 'https://{{ lxc_instance.hostname }}/bigbluebutton/api/'
+
+          - name: '{{ lxc_instance.name }}: Stop bigbluebutton-exporter service if running'
+            command: 'lxc exec {{ lxc_instance.name }} -- systemctl stop bigbluebutton-exporter'
+            ignore_errors: true
+
+          - name: '{{ lxc_instance.name }}: Install Python 3 pip'
+            command: >-
+              lxc exec {{ lxc_instance.name }} -- sh -c '
+              DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip
+              '
+
+          - name: '{{ lxc_instance.name }}: Clone bbb_exporter repository'
+            command: >-
+              lxc exec {{ lxc_instance.name }} -- sh -c '
+              cd /opt &&
+              rm -rf {{ bbb_lxc_bbb_exporter_install_dir }} &&
+              git clone {{ bbb_lxc_bbb_exporter_git_repo }} {{ bbb_lxc_bbb_exporter_install_dir }} &&
+              cd {{ bbb_lxc_bbb_exporter_install_dir }} &&
+              git checkout {{ bbb_lxc_node_exporter_version }}
+              '
+
+          - name: '{{ lxc_instance.name }}: Install Python dependencies'
+            command: >-
+              lxc exec {{ lxc_instance.name }} -- sh -c '
+              cd {{ bbb_lxc_bbb_exporter_install_dir }} &&
+              pip3 install -r requirements.txt
+              '
+
+          - name: '{{ lxc_instance.name }}: Create bbb-exporter user'
+            command: >-
+              lxc exec {{ lxc_instance.name }} -- sh -c '
+              id {{ bbb_lxc_bbb_exporter_user }} >/dev/null 2>&1 || 
+              useradd -r -d {{ bbb_lxc_bbb_exporter_install_dir }} -s /usr/sbin/nologin {{ bbb_lxc_bbb_exporter_user }}
+              '
+
+          - name: '{{ lxc_instance.name }}: Set ownership for bbb_exporter'
+            command: >-
+              lxc exec {{ lxc_instance.name }} -- sh -c '
+              chown -R {{ bbb_lxc_bbb_exporter_user }}:{{ bbb_lxc_bbb_exporter_user }} {{ bbb_lxc_bbb_exporter_install_dir }}
+              '
+
+          - name: '{{ lxc_instance.name }}: Copy systemd service file'
+            command: >-
+              lxc exec {{ lxc_instance.name }} -- sh -c '
+              cp {{ bbb_lxc_bbb_exporter_systemd_source }}/bigbluebutton-exporter.service /lib/systemd/system/
+              '
+
+          - name: '{{ lxc_instance.name }}: Create config directory'
+            command: >-
+              lxc exec {{ lxc_instance.name }} -- mkdir -p {{ bbb_lxc_bbb_exporter_config_dir }}
+
+          - name: '{{ lxc_instance.name }}: Render bbb_exporter settings.env'
+            template:
+              src: bbb/bbb_exporter_settings.env.j2
+              dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bbb_exporter_settings.env"
+              mode: 0644
+
+          - name: '{{ lxc_instance.name }}: Deploy bbb_exporter settings.env'
+            command: >-
+              lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bbb_exporter_settings.env
+                {{ lxc_instance.name }}{{ bbb_lxc_bbb_exporter_config_dir }}/settings.env
+
+          - name: '{{ lxc_instance.name }}: Enable and start bbb_exporter service'
+            command: 'lxc exec {{ lxc_instance.name }} -- sh -c "systemctl daemon-reload && systemctl enable --now bigbluebutton-exporter"'
+        when: lxc_instance.install_bbb
+
+      - name: '{{ lxc_instance.name }}: Render node_exporter systemd unit'
+        template:
+          src: bbb/node_exporter.service.j2
+          dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_node_exporter.service"
+          mode: 0644
+
+      - name: '{{ lxc_instance.name }}: Deploy node_exporter systemd unit'
+        command: >-
+          lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_node_exporter.service
+            {{ lxc_instance.name }}/etc/systemd/system/node_exporter.service
+
+      - name: '{{ lxc_instance.name }}: Enable and start node_exporter service'
+        command: 'lxc exec {{ lxc_instance.name }} -- sh -c "systemctl daemon-reload && systemctl enable --now node_exporter"'
+
+      - name: '{{ lxc_instance.name }}: Configure netdata to listen on localhost only'
+        command: >-
+          lxc exec {{ lxc_instance.name }} -- sh -c '
+          mkdir -p /etc/netdata &&
+          echo "[web]" > /etc/netdata/netdata.conf &&
+          echo "  bind to = 127.0.0.1" >> /etc/netdata/netdata.conf
+          '
+
+      - name: '{{ lxc_instance.name }}: Enable and start netdata service'
+        command: 'lxc exec {{ lxc_instance.name }} -- systemctl restart netdata'
+    when: not use_docker_compose|bool
+
+  # Common configuration for both methods
+  - name: '{{ lxc_instance.name }}: Create node_exporter directory for nginx config'
+    command: 'lxc exec {{ lxc_instance.name }} -- mkdir -p {{ bbb_lxc_node_exporter_dir }}'
+    when: not use_docker_compose|bool
 
   - fail:
       msg: "Password must not exceed limit of 8 characters, given {{ bbb_lxc_node_exporter_pass|length }} characters"
-    when: bbb_lxc_node_exporter_pass and bbb_lxc_node_exporter_pass|length > 8
+    when: bbb_lxc_node_exporter_pass is defined and bbb_lxc_node_exporter_pass|length > 8
 
   - name: '{{ lxc_instance.name }}: Configure nginx password file'
     command:
@@ -73,7 +233,8 @@
     with_items:
       - "echo -n \"{{ bbb_lxc_node_exporter_user }}:\" > {{ bbb_lxc_node_exporter_dir }}/.htpasswd"
       - "openssl passwd \"{{ bbb_lxc_node_exporter_pass }}\" >> {{ bbb_lxc_node_exporter_dir }}/.htpasswd"
-    when: bbb_lxc_node_exporter_pass
+    when: bbb_lxc_node_exporter_pass is defined and bbb_lxc_node_exporter_pass|length > 0
+
 
   - name: '{{ lxc_instance.name }}: Render node_exporter nginx template'
     template:

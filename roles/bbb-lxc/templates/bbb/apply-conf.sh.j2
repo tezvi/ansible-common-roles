@@ -5,12 +5,16 @@
 source /etc/bigbluebutton/bbb-conf/apply-lib.sh
 
 enableUFWRules
+
+{% if lxc_instance.bbb_version in ['xenial-22', 'bionic-23', 'bionic-24', 'focal-270'] %}
 {% if bbb_lxc_multiple_kurentos %}
 enableMultipleKurentos
 {% else %}
 disableMultipleKurentos
 {% endif %}
+{% endif %}
 
+{% if lxc_instance.bbb_version in ['xenial-22', 'bionic-23', 'bionic-24', 'focal-270'] %}
 METEOR_SETTINGS_FILE=/usr/share/meteor/bundle/programs/server/assets/app/config/settings.yml
 
 {% if bbb_lxc_html5_title and bbb_lxc_html5_title|length %}
@@ -26,3 +30,23 @@ yq w -i $METEOR_SETTINGS_FILE public.clientLog.external.enabled "false"
 {% endif %}
 
 chown meteor:meteor $METEOR_SETTINGS_FILE
+{% endif %}
+
+{% if lxc_instance.bbb_version in ['jammy-300'] %}
+# BigBlueButton 3.0+ uses a new config file location (no more Meteor)
+BBB_HTML5_CONFIG=/etc/bigbluebutton/bbb-html5.yml
+
+{% if bbb_lxc_html5_title and bbb_lxc_html5_title|length %}
+yq eval -i '.public.app.clientTitle = "{{ bbb_lxc_html5_title }}"' $BBB_HTML5_CONFIG
+{% endif %}
+
+{% if bbb_lxc_html5_external_debug_url and bbb_lxc_html5_external_debug_url|length %}
+yq eval -i '.public.clientLog.external.enabled = true' $BBB_HTML5_CONFIG
+yq eval -i '.public.clientLog.external.url = "{{ bbb_lxc_html5_external_debug_url }}"' $BBB_HTML5_CONFIG
+yq eval -i '.public.clientLog.external.level = "warn"' $BBB_HTML5_CONFIG
+{% else %}
+yq eval -i '.public.clientLog.external.enabled = false' $BBB_HTML5_CONFIG
+{% endif %}
+{% endif %}
+
+

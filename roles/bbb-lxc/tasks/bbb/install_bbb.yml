@@ -14,6 +14,17 @@
       - bigbluebutton
       - default
 
+  - set_fact:
+      bbb_install_cmd: >
+        /bin/bash /root/bbb-install.sh -v {{ lxc_instance.bbb_version }} -w -s {{ lxc_instance.hostname }} -e {{ lxc_instance.email }}
+      when: and lxc_instance.bbb_version in ['xenial-22', 'bionic-23', 'bionic-24', 'focal-270']
+
+  - set_fact:
+      bbb_install_cmd: > 
+        /bin/bash /root/bbb-install.sh -v {{ lxc_instance.bbb_version }} -w -s {{ lxc_instance.hostname }} 
+          -e {{ lxc_instance.email }} --no-ssl -c '{{ bbb_lxc_turn_server }}:{{ bbb_lxc_turn_secret }}'
+      when: not lxc_instance.bbb_version in ['bionic-23', 'bionic-24', 'focal-270']
+
   - name: '{{ lxc_instance.name }}: Install BBB'
     command:
       cmd: "lxc exec {{ lxc_instance.name }} -- sh -c '{{ item }}'"
@@ -63,9 +74,19 @@
           dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_freeswitch.service'
         - src: '/lib/systemd/system/bbb-webrtc-sfu.service'
           dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_webrtc-sfu.service'
-    when: >
-      lxc_instance.bbb_version == 'bionic-23' or lxc_instance.bbb_version == 'bionic-24'
-      or lxc_instance.bbb_version == 'focal-270'
+    when: lxc_instance.bbb_version in ['bionic-23', 'bionic-24', 'focal-270']
+
+  - set_fact:
+      bbb_template_files:
+        - src: '{{ bbb_lxc_bbb_properties_file }}'
+          dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_bigbluebutton.properties'
+        - src: '{{ bbb_lxc_bbb_freeswitch_config_file }}'
+          dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_freeswitch_vars.xml'
+        - src: '/lib/systemd/system/freeswitch.service'
+          dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_freeswitch.service'
+        - src: '/lib/systemd/system/bbb-webrtc-sfu.service'
+          dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_webrtc-sfu.service'
+    when: lxc_instance.bbb_version in ['jammy-300']
 
   - name: '{{ lxc_instance.name }}: Copy BBB config files to host for provisioning'
     command:
@@ -102,7 +123,7 @@
         replace: 'disableRecordingDefault=false'
       - find: 'muteOnStart=false'
         replace: 'muteOnStart=true'
-    when: lxc_instance.bbb_version != 'focal-270'
+    when: lxc_instance.bbb_version in ['bionic-23', 'bionic-24']
 
   - name: '{{ lxc_instance.name }}: Provision BBB properties file'
     lineinfile:
@@ -127,9 +148,9 @@
         replace: 'disableRecordingDefault=false'
       - find: 'muteOnStart=false'
         replace: 'muteOnStart=true'
-    when: lxc_instance.bbb_version == 'focal-270'
+    when: lxc_instance.bbb_version in ['focal-270', 'jammy-300']
 
-  - name: '{{ lxc_instance.name }}: Provision BBB html5 unit file'
+  - name: '{{ lxc_instance.name }}: Provision systemd unit file for cpu scheduling'
     lineinfile:
       dest: "{{ item.0.dest }}"
       regexp: "{{ item.1.find }}"
@@ -156,7 +177,7 @@
     ignore_errors: true
     with_items: "{{ bbb_template_files }}"
 
-  - name: '{{ lxc_instance.name }}: Push new BBB properties file'
+  - name: '{{ lxc_instance.name }}: Push new properties file'
     command:
       cmd: "lxc {{ item.0 | replace('%FILE%', item.1.src) | replace('%SRC%', item.1.dest) }}"
     with_nested:
@@ -166,7 +187,7 @@
     register: bbb_lxc_properties_changed_stat
     when: bbb_lxc_config_diff.results[0].rc != 0
 
-  - name: '{{ lxc_instance.name }}: Push new BBB HTML5 systemd unit files'
+  - name: '{{ lxc_instance.name }}: Push new systemd unit files'
     command:
       cmd: "lxc {{ item.0 | replace('%FILE%', item.1.src) | replace('%SRC%', item.1.dest) }}"
     with_nested:
@@ -286,19 +307,21 @@
     when: bbb_lxc_slides_available|bool
 
   # configure turn server support
-  - name: '{{ lxc_instance.name }}: Render turn server configuration xml'
-    template:
-      src: bbb/turn-stun-servers.xml.j2
-      dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_turn-stun-servers.xml"
-    when: bbb_lxc_turn_server
+  - block:
+    - name: '{{ lxc_instance.name }}: Render turn server configuration xml'
+      template:
+        src: bbb/turn-stun-servers.xml.j2
+        dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_turn-stun-servers.xml"
+      when: bbb_lxc_turn_server is defined and bbb_lxc_turn_server|length > 0
 
-  - name: 'Configure stun/turn server'
-    command: 'lxc {{ item }}'
-    with_items:
-      - exec {{ lxc_instance.name }} -- cp {{ bbb_lxc_turn_config_file }} {{ bbb_lxc_turn_config_file }}.bak-{{ ansible_date_time.epoch }}
-      - file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_turn-stun-servers.xml {{ lxc_instance.name }}{{ bbb_lxc_turn_config_file }}
-    when: bbb_lxc_turn_server
-    register: bbb_lxc_turn_configured_stat
+    - name: 'Configure stun/turn server'
+      command: 'lxc {{ item }}'
+      with_items:
+        - exec {{ lxc_instance.name }} -- cp {{ bbb_lxc_turn_config_file }} {{ bbb_lxc_turn_config_file }}.bak-{{ ansible_date_time.epoch }}
+        - file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_turn-stun-servers.xml {{ lxc_instance.name }}{{ bbb_lxc_turn_config_file }}
+      when: bbb_lxc_turn_server is defined and bbb_lxc_turn_server|length > 0
+      register: bbb_lxc_turn_configured_stat
+    when: lxc_instance.bbb_version in ['bionic-23', 'bionic-24', 'focal-270']
 
   - name: '{{ lxc_instance.name }}: Check if UFW is enabled'
     shell: "lxc exec {{ lxc_instance.name }} -- sh -c \"ufw status | grep 'Status: active'\""
