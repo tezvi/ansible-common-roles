@@ -85,7 +85,8 @@ bbb_scalelite_postgres_user: 'scalelite'
 bbb_scalelite_postgres_password: ''
 
 # Optional: override redis username/password; if password is empty, redis will run without auth.
-bbb_scalelite_redis_user: 'scalelite'
+# NOTE: Leave bbb_scalelite_redis_user empty when using requirepass (ACL-less) to avoid client warnings.
+bbb_scalelite_redis_user: ''
 bbb_scalelite_redis_password: ''
 
 # Scalelite protected recordings feature flag
