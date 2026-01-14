@@ -1,0 +1,28 @@
+[Unit]
+Description=Scalelite Redis
+After=network-online.target
+Wants=network-online.target
+Before=scalelite.target
+PartOf=scalelite.target
+
+[Service]
+EnvironmentFile=/etc/default/scalelite
+ExecStartPre=-/usr/bin/docker kill scalelite-redis
+ExecStartPre=-/usr/bin/docker rm scalelite-redis
+ExecStartPre=/usr/bin/docker pull ${SCALELITE_REDIS_IMAGE}
+ExecStart=/usr/bin/docker run --log-opt max-size=10m --log-opt max-file=5 \
+  --name scalelite-redis \
+  --env-file /etc/default/scalelite \
+  --network ${SCALELITE_DOCKER_NETWORK} \
+  --ip ${SCALELITE_REDIS_IP} \
+  --restart=always \
+  --memory {{ bbb_scalelite_redis_memory_limit }} \
+  -v ${SCALELITE_DATA_DIR}/redis:/data \
+  --mount type=bind,source=${SCALELITE_CONFIG_DIR}/redis/redis.conf,target=/etc/redis/redis.conf,readonly \
+  $SCALELITE_REDIS_EXTRA_OPTS \
+  ${SCALELITE_REDIS_IMAGE} \
+  redis-server /etc/redis/redis.conf
+ExecStartPost=
+
+[Install]
+WantedBy=scalelite.target

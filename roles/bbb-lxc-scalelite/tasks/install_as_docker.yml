@@ -24,10 +24,3 @@
     - 'chdir {{ bbb_scalelite_dir }}; git reset --hard'
     - 'chdir {{ bbb_scalelite_dir }}; git pull'
   when: bbb_scalelite_run_exists.rc == 0
-
-- name: Configure Scalelite container UFW firewall
-  command: 'lxc exec {{ bbb_scalelite_lxc.name }} -- ufw {{ item }}'
-  with_items:
-    - 'allow http'
-    - 'allow https'
-    - 'enable'

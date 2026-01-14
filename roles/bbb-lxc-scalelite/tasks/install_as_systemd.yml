@@ -1,0 +1,208 @@
+---
+
+# Systemd install of Scalelite (still uses Docker behind the scenes).
+# This follows the official Scalelite documentation pattern:
+# - /etc/default/scalelite env file
+# - scalelite.target + {api,nginx,poller,recording-importer}.service
+
+# Ensure Redis-required sysctl is configured on the LXD host kernel (containers can't set it).
+- name: 'LXD host: Ensure vm.overcommit_memory=1 for Redis (kernel sysctl)'
+  become: true
+  block:
+    - name: 'LXD host: Persist vm.overcommit_memory sysctl'
+      copy:
+        dest: /etc/sysctl.d/99-redis-overcommit.conf
+        content: |
+          vm.overcommit_memory = 1
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: 'LXD host: Apply vm.overcommit_memory immediately'
+      command:
+        cmd: 'sysctl -w vm.overcommit_memory=1'
+      changed_when: false
+
+    - name: 'LXD host: Reload sysctl configuration'
+      command:
+        cmd: 'sysctl --system'
+      changed_when: false
+      failed_when: false
+
+- name: Install docker to scalelite LXC instance
+  include_role:
+    name: bbb-lxc
+    tasks_from: install_docker
+  vars:
+    lxc_instance: '{{ bbb_scalelite_lxc }}'
+
+- name: '{{ bbb_scalelite_lxc.name }}: Ensure required base packages are installed'
+  command:
+    cmd: >-
+      lxc exec {{ bbb_scalelite_lxc.name }} --
+      sh -c 'DEBIAN_FRONTEND=noninteractive apt-get update &&
+             DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl'
+
+- name: Assert required systemd configuration is provided
+  assert:
+    that:
+      - bbb_scalelite_dir is defined
+      - bbb_scalelite_dir | length > 0
+      - bbb_scalelite_lxc.hostname is defined
+      - bbb_scalelite_lxc.hostname | length > 0
+    fail_msg: >-
+      Missing required vars for systemd install. Please set:
+      bbb_scalelite_dir, bbb_scalelite_lxc.hostname
+
+- name: '{{ bbb_scalelite_lxc.name }}: Ensure scalelite docker network exists (fixed subnet)'
+  command:
+    cmd: |
+      lxc exec {{ bbb_scalelite_lxc.name }} -- sh -ceu '
+        docker network inspect {{ bbb_scalelite_docker_network_name }} >/dev/null 2>&1 && exit 0;
+        docker network create \
+          --driver bridge \
+          --subnet {{ bbb_scalelite_docker_network_subnet }} \
+          --gateway {{ bbb_scalelite_docker_network_gateway }} \
+          {{ bbb_scalelite_docker_network_name }}
+      '
+
+- name: '{{ bbb_scalelite_lxc.name }}: Create recordings directories'
+  command:
+    cmd: >-
+      lxc exec {{ bbb_scalelite_lxc.name }} --
+      sh -c 'mkdir -p {{ bbb_scalelite_recordings }} {{ bbb_scalelite_recordings_spool }}'
+  when: bbb_scalelite_recordings is defined and bbb_scalelite_recordings|length > 0
+
+- name: '{{ bbb_scalelite_lxc.name }}: Install Scalelite via systemd'
+  block:
+    - name: '{{ bbb_scalelite_lxc.name }}: Check if /etc/default/scalelite exists'
+      command:
+        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "test -f /etc/default/scalelite"'
+      register: bbb_scalelite_systemd_env_exists
+      ignore_errors: true
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Render /etc/default/scalelite'
+      template:
+        src: scalelite-systemd.env.j2
+        dest: '{{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_systemd_env'
+        mode: 0640
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Push /etc/default/scalelite'
+      command:
+        cmd: 'lxc file push {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_systemd_env {{ bbb_scalelite_lxc.name }}/etc/default/scalelite'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Render Scalelite systemd unit files'
+      template:
+        src: '{{ item }}.j2'
+        dest: '{{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_{{ item }}'
+        mode: 0644
+      loop:
+        - scalelite.target
+        - scalelite-postgres.service
+        - scalelite-redis.service
+        - scalelite-api.service
+        - scalelite-nginx.service
+        - scalelite-poller.service
+        - scalelite-recording-importer.service
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Push Scalelite systemd unit files'
+      command:
+        cmd: >-
+          lxc file push {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_{{ item }}
+          {{ bbb_scalelite_lxc.name }}/etc/systemd/system/{{ item }}
+      loop:
+        - scalelite.target
+        - scalelite-postgres.service
+        - scalelite-redis.service
+        - scalelite-api.service
+        - scalelite-nginx.service
+        - scalelite-poller.service
+        - scalelite-recording-importer.service
+
+    # --- Redis config (simple redis.conf persisted under SCALELITE_DATA_DIR/redis) ---
+    - name: '{{ bbb_scalelite_lxc.name }}: Render redis.conf'
+      template:
+        src: redis.conf.j2
+        dest: '{{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_redis_conf'
+        mode: 0755
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Push redis.conf'
+      command:
+        cmd: >-
+          lxc file push {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_redis_conf
+          {{ bbb_scalelite_lxc.name }}/{{ bbb_scalelite_dir }}/config/redis/redis.conf
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Set permissions on redis.conf'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'chmod 0755 {{ bbb_scalelite_dir }}/config/redis/redis.conf'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Preflight validate Redis persistence directory and redis.conf'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -ceu '
+            test -d {{ bbb_scalelite_dir }}/data/redis;
+            test -d {{ bbb_scalelite_dir }}/config/redis;
+            test -s {{ bbb_scalelite_dir }}/config/redis/redis.conf;
+            # ensure we can write to the redis data dir (host bind-mount permissions)
+            touch {{ bbb_scalelite_dir }}/data/redis/.ansible_write_test && rm -f {{ bbb_scalelite_dir }}/data/redis/.ansible_write_test;
+          '
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Reload systemd'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'systemctl daemon-reload'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Enable Scalelite units'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'systemctl enable scalelite.target scalelite-postgres.service scalelite-redis.service scalelite-api.service scalelite-nginx.service scalelite-poller.service scalelite-recording-importer.service'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Start Scalelite'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'systemctl restart scalelite.target'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Wait for scalelite-api container to exist'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c "docker ps --format '%n' | grep -qx scalelite-api"
+      register: scalelite_api_container_exists
+      retries: 20
+      delay: 3
+      until: scalelite_api_container_exists.rc == 0
+      when: bbb_scalelite_systemd_env_exists is defined and bbb_scalelite_systemd_env_exists.rc != 0
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Initialize scalelite-api database (first install only)'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'docker exec -i scalelite-api bin/rake db:setup'
+      when: bbb_scalelite_systemd_env_exists is defined and bbb_scalelite_systemd_env_exists.rc != 0
+
+  always:
+    - name: '{{ bbb_scalelite_lxc.name }}: Remove temporary systemd unit files'
+      shell: >-
+        rm -f {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_scalelite.target
+        {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_scalelite-postgres.service
+        {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_scalelite-redis.service
+        {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_scalelite-api.service
+        {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_scalelite-nginx.service
+        {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_scalelite-poller.service
+        {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_scalelite-recording-importer.service
+      ignore_errors: true
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Validate /etc/default/scalelite contains concrete DATABASE_URL and REDIS_URL'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -ceu 'grep -E "^DATABASE_URL=postgres://" /etc/default/scalelite >/dev/null \
+            && grep -E "^REDIS_URL=redis://" /etc/default/scalelite >/dev/null \
+            && grep -E "@scalelite-postgres:5432/" /etc/default/scalelite >/dev/null \
+            && grep -E "scalelite-redis:6379/0$" /etc/default/scalelite >/dev/null'

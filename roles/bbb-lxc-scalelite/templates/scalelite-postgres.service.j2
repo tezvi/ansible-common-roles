@@ -1,0 +1,25 @@
+[Unit]
+Description=Scalelite PostgreSQL
+After=network-online.target
+Wants=network-online.target
+Before=scalelite.target
+PartOf=scalelite.target
+
+[Service]
+EnvironmentFile=/etc/default/scalelite
+ExecStartPre=-/usr/bin/docker kill scalelite-postgres
+ExecStartPre=-/usr/bin/docker rm scalelite-postgres
+ExecStartPre=/usr/bin/docker pull ${SCALELITE_POSTGRES_IMAGE}
+ExecStart=/usr/bin/docker run --log-opt max-size=10m --log-opt max-file=5 \
+  --name scalelite-postgres \
+  --env-file /etc/default/scalelite \
+  --network ${SCALELITE_DOCKER_NETWORK} \
+  --ip ${SCALELITE_POSTGRES_IP} \
+  --restart=always \
+  -v ${SCALELITE_DATA_DIR}/postgres:/var/lib/postgresql/data \
+  $SCALELITE_POSTGRES_EXTRA_OPTS \
+  ${SCALELITE_POSTGRES_IMAGE}
+ExecStartPost=
+
+[Install]
+WantedBy=scalelite.target

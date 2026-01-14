@@ -1,0 +1,18 @@
+---
+
+# Restart Scalelite according to installation mode.
+
+- name: Restart Scalelite (docker-compose mode)
+  command:
+    cmd: >-
+      lxc exec {{ bbb_scalelite_lxc.name }} --
+      sh -c 'cd {{ bbb_scalelite_dir }} && docker compose down --remove-orphans && docker compose up -d'
+  when: bbb_scalelite_install_mode == 'docker_compose'
+
+- name: Restart Scalelite (systemd mode)
+  command:
+    cmd: >-
+      lxc exec {{ bbb_scalelite_lxc.name }} --
+      sh -c 'systemctl restart scalelite.target'
+  when: bbb_scalelite_install_mode == 'systemd'
+

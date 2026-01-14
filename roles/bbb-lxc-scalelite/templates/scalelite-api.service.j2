@@ -1,0 +1,25 @@
+[Unit]
+Description=Scalelite API
+After=network-online.target scalelite-postgres.service scalelite-redis.service
+Wants=network-online.target
+Requires=scalelite-postgres.service scalelite-redis.service
+Before=scalelite.target
+PartOf=scalelite.target
+
+[Service]
+EnvironmentFile=/etc/default/scalelite
+ExecStartPre=-/usr/bin/docker kill scalelite-api
+ExecStartPre=-/usr/bin/docker rm scalelite-api
+ExecStartPre=/usr/bin/docker pull blindsidenetwks/scalelite:${SCALELITE_TAG}-api
+ExecStart=/usr/bin/docker run --log-opt max-size=10m --log-opt max-file=5 \
+  --name scalelite-api \
+  --env-file /etc/default/scalelite \
+  --network ${SCALELITE_DOCKER_NETWORK} \
+  --ip ${SCALELITE_API_IP} \
+  --mount type=bind,source=${SCALELITE_RECORDING_DIR},target=/var/bigbluebutton \
+  $SCALELITE_API_EXTRA_OPTS \
+  blindsidenetwks/scalelite:${SCALELITE_TAG}-api
+ExecStartPost=
+
+[Install]
+WantedBy=scalelite.target

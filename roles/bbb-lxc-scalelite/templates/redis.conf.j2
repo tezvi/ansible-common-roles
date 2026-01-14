@@ -1,0 +1,28 @@
+# {{ ansible_managed }}
+# Redis configuration for Scalelite.
+# This file is mounted into the redis container and used on boot.
+
+# Listen on all interfaces inside the container.
+bind 0.0.0.0
+port 6379
+
+# Security: prefer using ACL-less auth via requirepass.
+{% if bbb_scalelite_redis_password is defined and bbb_scalelite_redis_password|length > 0 %}
+requirepass {{ bbb_scalelite_redis_password }}
+{% endif %}
+
+# Persistence settings.
+appendonly yes
+appendfilename "appendonly.aof"
+appendfsync everysec
+
+# Keep a lightweight RDB snapshot as an extra safety net.
+# Save after 60s if at least 1 key changed.
+save 60 1
+
+# Store persistence files under /data (docker volume mount).
+dir /data
+
+# Reduce chances of background save issues in constrained containers.
+stop-writes-on-bgsave-error yes
+

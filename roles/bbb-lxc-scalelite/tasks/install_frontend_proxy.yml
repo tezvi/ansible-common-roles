@@ -1,0 +1,123 @@
+---
+
+# Installs an nginx reverse proxy + certbot inside the Scalelite LXC container and proxies
+# to the internal Scalelite Docker network.
+#
+# IMPORTANT: This task operates *inside* the Scalelite LXC container (bbb_scalelite_lxc.name).
+
+- name: '{{ bbb_scalelite_lxc.name }}: Install and configure nginx frontend proxy'
+  block:
+    - name: Assert frontend proxy config is provided
+      assert:
+        that:
+          - bbb_scalelite_frontend_proxy_server_name is defined
+          - (bbb_scalelite_frontend_proxy_server_name | length) > 0
+          - bbb_scalelite_frontend_proxy_email is defined
+          - (bbb_scalelite_frontend_proxy_email | length) > 0
+          - bbb_scalelite_frontend_proxy_upstream_ip is defined
+          - (bbb_scalelite_frontend_proxy_upstream_ip | length) > 0
+        fail_msg: >-
+          Missing required frontend proxy vars. Please set:
+          bbb_scalelite_frontend_proxy_server_name, bbb_scalelite_frontend_proxy_email,
+          bbb_scalelite_frontend_proxy_upstream_ip
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Install nginx + certbot packages'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'DEBIAN_FRONTEND=noninteractive apt-get update &&
+                 DEBIAN_FRONTEND=noninteractive apt-get install -y nginx certbot python3-certbot-nginx'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Render HTTP-only nginx site config (certbot bootstrap)'
+      template:
+        src: scalelite-frontend-proxy.http-only.nginx.conf.j2
+        dest: '{{ bbb_scalelite_tmp_dir }}/scalelite_frontend_proxy_http_{{ bbb_scalelite_lxc.name }}.conf'
+        mode: '0644'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Push HTTP-only nginx site config'
+      command:
+        cmd: >-
+          lxc file push {{ bbb_scalelite_tmp_dir }}/scalelite_frontend_proxy_http_{{ bbb_scalelite_lxc.name }}.conf
+          {{ bbb_scalelite_lxc.name }}/etc/nginx/sites-available/scalelite
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Enable scalelite nginx site'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'ln -sf /etc/nginx/sites-available/scalelite /etc/nginx/sites-enabled/scalelite'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Disable default nginx site if present'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'rm -f /etc/nginx/sites-enabled/default || true'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Ensure nginx is started (HTTP-only)'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'systemctl enable --now nginx && systemctl reload nginx'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Allow http/https in UFW if UFW is installed'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'if command -v ufw >/dev/null 2>&1; then ufw allow http || true; ufw allow https || true; fi'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Obtain/refresh LetsEncrypt certificate with nginx plugin'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          certbot --nginx -n --agree-tos
+          -m {{ bbb_scalelite_frontend_proxy_email }}
+          -d {{ bbb_scalelite_frontend_proxy_server_name }}
+      register: certbot_result
+      changed_when: "'Certificate not yet due for renewal' not in (certbot_result.stdout | default(''))"
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Show letsencrypt log tail on certbot failure'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'tail -n 60 /var/log/letsencrypt/letsencrypt.log'
+      when: certbot_result.rc is defined and certbot_result.rc != 0
+      changed_when: false
+      failed_when: false
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Render HTTPS nginx site config'
+      template:
+        src: scalelite-frontend-proxy.nginx.conf.j2
+        dest: '{{ bbb_scalelite_tmp_dir }}/scalelite_frontend_proxy_https_{{ bbb_scalelite_lxc.name }}.conf'
+        mode: '0644'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Push HTTPS nginx site config'
+      command:
+        cmd: >-
+          lxc file push {{ bbb_scalelite_tmp_dir }}/scalelite_frontend_proxy_https_{{ bbb_scalelite_lxc.name }}.conf
+          {{ bbb_scalelite_lxc.name }}/etc/nginx/sites-available/scalelite
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Reload nginx after certbot'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'nginx -t && systemctl reload nginx'
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Enable certbot renew timer if available'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'systemctl enable --now certbot.timer || true'
+      changed_when: false
+
+    - name: '{{ bbb_scalelite_lxc.name }}: Check certbot renewal configuration (dry-run)'
+      command:
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c 'certbot -n --agree-tos renew --dry-run || true'
+      changed_when: false
+
+  always:
+    - name: Cleanup rendered nginx configs
+      shell: >-
+        rm -f {{ bbb_scalelite_tmp_dir }}/scalelite_frontend_proxy_http_{{ bbb_scalelite_lxc.name }}.conf
+        {{ bbb_scalelite_tmp_dir }}/scalelite_frontend_proxy_https_{{ bbb_scalelite_lxc.name }}.conf
+      ignore_errors: true

@@ -1,9 +1,53 @@
 ---
 
-- include_tasks: install.yml
+# Fail fast on invalid configuration combinations.
+- name: Assert frontend proxy requires Scalelite nginx to run behind a proxy
+  assert:
+    that:
+      - not (bbb_scalelite_frontend_proxy_enabled|default(false)|bool) or (bbb_scalelite_nginx_behind_proxy|bool)
+    fail_msg: >-
+      Invalid configuration: bbb_scalelite_frontend_proxy_enabled=true requires bbb_scalelite_nginx_behind_proxy=true.
+      Please set bbb_scalelite_nginx_behind_proxy: true.
+
+# Secrets are required by templates and must be stable across runs.
+- name: Assert Scalelite secrets are provided by the playbook
+  assert:
+    that:
+      - bbb_scalelite_secret_key_base is defined
+      - (bbb_scalelite_secret_key_base | string | length) > 0
+      - bbb_scalelite_loadbalancer_secret is defined
+      - (bbb_scalelite_loadbalancer_secret | string | length) > 0
+      - (bbb_scalelite_secret_key_base | string) is match('^[0-9a-fA-F]{128}$')
+      - (bbb_scalelite_loadbalancer_secret | string) is match('^[0-9a-fA-F]{128}$')
+    fail_msg: >-
+      Missing or invalid Scalelite secrets.
+      Please define both:
+        - bbb_scalelite_secret_key_base
+        - bbb_scalelite_loadbalancer_secret
+      Expected format: 128 hex chars (generate with: openssl rand -hex 64)
+
+- name: Set internal Scalelite secret facts for templates
+  set_fact:
+    scalelite_secret_base: '{{ bbb_scalelite_secret_key_base }}'
+    scalelite_loadbalancer_secret: '{{ bbb_scalelite_loadbalancer_secret }}'
+
+# Create required directories early (works for both docker-compose and systemd installs)
+- include_tasks: prepare_dirs.yml
+
+- include_tasks: install_as_docker.yml
+  when: bbb_scalelite_install_mode == 'docker_compose'
+
+- include_tasks: install_as_systemd.yml
+  when: bbb_scalelite_install_mode == 'systemd'
 
 - include_tasks: configure.yml
+
+- include_tasks: install_frontend_proxy.yml
+  when: bbb_scalelite_frontend_proxy_enabled|default(false)|bool
 
 - include_tasks: register_bbb_members.yml
 
 - include_tasks: configure_recordings.yml
+
+- include_tasks: install_transfer_recordings_cron.yml
+  when: bbb_scalelite_transfer_spool_recordings_enabled | default(false) | bool

@@ -1,0 +1,50 @@
+---
+
+# Deploy a spool-transfer script and root cronjob inside the Scalelite LXC.
+# Intended for multi-Scalelite setups where non-primary nodes push recordings to a primary node.
+
+- name: Assert transfer-spool recordings configuration
+  assert:
+    that:
+      - bbb_scalelite_transfer_spool_recordings_target_host is defined
+      - bbb_scalelite_transfer_spool_recordings_target_host | length > 0
+    fail_msg: >-
+      bbb_scalelite_transfer_spool_recordings_enabled=true requires
+      bbb_scalelite_transfer_spool_recordings_target_host to be set (hostname/IP of primary Scalelite).
+
+- name: '{{ bbb_scalelite_lxc.name }}: Ensure /root/bin exists'
+  command:
+    cmd: >-
+      lxc exec {{ bbb_scalelite_lxc.name }} --
+      sh -c 'mkdir -p /root/bin && chmod 0700 /root/bin'
+
+- name: '{{ bbb_scalelite_lxc.name }}: Render transfer_spool_recordings script'
+  template:
+    src: scalelite_transfer_recordings.sh
+    dest: '{{ bbb_scalelite_tmp_dir }}/transfer_spool_recordings_{{ bbb_scalelite_lxc.name }}'
+    mode: '0700'
+
+- name: '{{ bbb_scalelite_lxc.name }}: Push transfer_spool_recordings script'
+  command:
+    cmd: >-
+      lxc file push {{ bbb_scalelite_tmp_dir }}/transfer_spool_recordings_{{ bbb_scalelite_lxc.name }}
+      {{ bbb_scalelite_lxc.name }}/root/bin/transfer_spool_recordings
+
+- name: '{{ bbb_scalelite_lxc.name }}: Ensure transfer_spool_recordings is executable'
+  command:
+    cmd: >-
+      lxc exec {{ bbb_scalelite_lxc.name }} --
+      sh -c 'chmod 0700 /root/bin/transfer_spool_recordings'
+
+- name: '{{ bbb_scalelite_lxc.name }}: Install root cronjob for transfer_spool_recordings'
+  command:
+    cmd: >-
+      lxc exec {{ bbb_scalelite_lxc.name }} -- sh -ceu
+      '(
+        crontab -l 2>/dev/null | grep -v "transfer_spool_recordings" || true
+        echo "* * * * * /root/bin/transfer_spool_recordings >> /var/log/scalelite_transfer_recordings.log 2>&1"
+      ) | crontab -'
+
+- name: '{{ bbb_scalelite_lxc.name }}: Cleanup rendered transfer_spool_recordings temp file'
+  shell: 'rm -f {{ bbb_scalelite_tmp_dir }}/transfer_spool_recordings_{{ bbb_scalelite_lxc.name }}'
+  ignore_errors: true

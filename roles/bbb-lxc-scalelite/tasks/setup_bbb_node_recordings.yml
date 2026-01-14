@@ -24,16 +24,32 @@
         url: "{{ bbb_scalelite_recordings_script_url }}"
         dest: "{{ bbb_scalelite_tmp_dir }}/{{ lxc_instance.name }}_post_publish_scalelite.rb"
 
-    - name: '{{ lxc_instance.name }}: Download prune recordings script'
+
+    - name: '{{ lxc_instance.name }}: Download ruby recording notifier script'
+      get_url:
+        url: "{{ bbb_recording_notifier_script_url }}"
+        dest: "{{ bbb_scalelite_tmp_dir }}/{{ lxc_instance.name }}_post_publish_recording_ready_callback.rb"
+
+    - name: '{{ lxc_instance.name }}: Download scalelite prune recordings script'
       get_url:
         url: "{{ bbb_scalelite_recordings_prune_script_url }}"
         dest: "{{ bbb_scalelite_tmp_dir }}/{{ lxc_instance.name }}_scalelite_prune_recordings.sh"
+
+    - name: '{{ lxc_instance.name }}: Patch scalelite prune recordings retention (MAXAGE/RAW_MAXAGE)'
+      replace:
+        path: "{{ bbb_scalelite_tmp_dir }}/{{ lxc_instance.name }}_scalelite_prune_recordings.sh"
+        regexp: '^({{ item.var }}=)([0-9]+)$'
+        replace: '\\1{{ item.value }}'
+      loop:
+        - { var: 'MAXAGE', value: '{{ bbb_scalelite_recordings_prune_maxage_days }}' }
+        - { var: 'RAW_MAXAGE', value: '{{ bbb_scalelite_recordings_prune_raw_maxage_days }}' }
 
     - name: '{{ lxc_instance.name }}: Push scalelite recording script config to {{ lxc_instance.name }}'
       command: 'lxc file push {{ bbb_scalelite_tmp_dir }}/{{ lxc_instance.name }}_{{ item }}'
       with_items:
         - 'scalelite-recording-hook-config.yml {{ lxc_instance.name }}/usr/local/bigbluebutton/core/scripts/scalelite.yml'
         - 'post_publish_scalelite.rb {{ lxc_instance.name }}/usr/local/bigbluebutton/core/scripts/post_publish/post_publish_scalelite.rb'
+        - 'post_publish_recording_ready_callback.rb {{ lxc_instance.name }}/usr/local/bigbluebutton/core/scripts/post_publish/post_publish_recording_ready_callback.rb'
         - 'scalelite_prune_recordings.sh {{ lxc_instance.name }}/etc/cron.daily/scalelite_prune_recordings'
 
     - name: '{{ lxc_instance.name }}: Configure executable mode for prune recordings script'

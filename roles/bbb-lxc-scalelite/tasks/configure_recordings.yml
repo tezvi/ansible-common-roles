@@ -22,24 +22,24 @@
         - 'chown -R 1000:{{ bbb_scalelite_spool_gid }} {{ bbb_scalelite_recordings_spool }}'
         - 'chmod -R g+rw {{ bbb_scalelite_recordings }}'
 
-    - name: Restart and test Scalelite containers
+    - name: Restart and test Scalelite services
       block:
-        - name: Restart Scalelite Docker containers
-          command:
-            cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "cd {{ bbb_scalelite_dir }}; docker compose down --remove-orphans; docker compose up -d"'
+        - name: Restart Scalelite
+          include_tasks: restart_scalelite.yml
 
-        - name: Check if spool directory is writable by docker image
+        - name: Check if spool directory is writable by recording importer container
           command: "lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c '{{ item }}'"
           with_items:
             - "docker exec scalelite-recording-importer touch /var/bigbluebutton/spool/test_{{ bbb_scalelite_lxc.name }}"
             - "docker exec scalelite-recording-importer rm /var/bigbluebutton/spool/test_{{ bbb_scalelite_lxc.name }}"
+          when: bbb_scalelite_install_mode in ['docker_compose', 'systemd']
       when: bbb_scalelite_restart_test|default(True)
 
     - name: Setup shared recordings for BBB instances
       include_tasks: setup_bbb_node_recordings.yml
       loop: '{{ bbb_lxc_instances }}'
-      when: bbb_lxc_instances is defined and lxc_instance.install_bbb
+      when: bbb_lxc_instances is defined and lxc_instance.install_bbb is defined and lxc_instance.install_bbb|bool
       loop_control:
         loop_var: lxc_instance
 
-  when: bbb_scalelite_recordings_spool|length
+  when: bbb_scalelite_recordings_spool is defined and bbb_scalelite_recordings_spool|length > 0

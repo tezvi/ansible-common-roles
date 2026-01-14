@@ -1,0 +1,37 @@
+---
+
+# Ensure base Scalelite directories exist early so both install modes can rely on them.
+# Note: Most operations here happen *inside* the Scalelite LXC.
+
+- name: '{{ bbb_scalelite_lxc.name }}: Ensure {{ bbb_scalelite_dir }} exists'
+  command:
+    cmd: >-
+      lxc exec {{ bbb_scalelite_lxc.name }} --
+      sh -ceu 'mkdir -p {{ bbb_scalelite_dir }}'
+
+- name: '{{ bbb_scalelite_lxc.name }}: Ensure Scalelite config and data directories exist (and data is writable)'
+  command:
+    cmd: >-
+      lxc exec {{ bbb_scalelite_lxc.name }} --
+      sh -ceu '
+        mkdir -p \
+          {{ bbb_scalelite_dir }}/config/redis \
+          {{ bbb_scalelite_dir }}/data/postgres \
+          {{ bbb_scalelite_dir }}/data/redis;
+        # Config should be readable only by root
+        chmod 0755 {{ bbb_scalelite_dir }}/config || true;
+        chmod 0755 {{ bbb_scalelite_dir }}/config/redis;
+        # Data must be writable (docker will run as root inside container)
+        chmod 0755 {{ bbb_scalelite_dir }}/data || true;
+        chmod 0777 {{ bbb_scalelite_dir }}/data/redis;
+      '
+
+- name: '{{ bbb_scalelite_lxc.name }}: Preflight validate redis data directory is writable'
+  command:
+    cmd: >-
+      lxc exec {{ bbb_scalelite_lxc.name }} --
+      sh -ceu '
+        touch {{ bbb_scalelite_dir }}/data/redis/.ansible_write_test;
+        rm -f {{ bbb_scalelite_dir }}/data/redis/.ansible_write_test;
+      '
+

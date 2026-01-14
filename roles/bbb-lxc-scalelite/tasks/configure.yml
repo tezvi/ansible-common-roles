@@ -1,62 +1,77 @@
 ---
 
+- name: Configure Scalelite container UFW firewall
+  command: 'lxc exec {{ bbb_scalelite_lxc.name }} -- ufw {{ item }}'
+  with_items:
+    - 'allow http'
+    - 'allow https'
+    - 'enable'
+
 - name: Configure Scalelite run
   block:
-    - name: Generate scalelite secret key base
-      command:
-        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- openssl rand -hex 64'
-      register: scalelite_secret_base_stat
-
-    - name: Generate scalelite loadbalancer secret
-      command:
-        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- openssl rand -hex 64'
-      register: scalelite_loadbalancer_secret_stat
-
-    - set_fact:
-        scalelite_secret_base: '{{ scalelite_secret_base_stat.stdout }}'
-        scalelite_loadbalancer_secret: '{{ scalelite_loadbalancer_secret_stat.stdout }}'
-
-    - command:
-        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- ls {{ bbb_scalelite_dir }}/.env'
-      register: bbb_scalelite_env_exists
-      ignore_errors: true
-
     - block:
-        - name: Ensures {{ bbb_scalelite_dir }} dir exists
-          file:
-            path: "{{ bbb_scalelite_dir }}"
-            state: directory
+        - command:
+            cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- ls {{ bbb_scalelite_dir }}/.env'
+          register: bbb_scalelite_env_exists
+          ignore_errors: true
 
-        - name: Create new env file for scalelite run template
-          template:
-            src: dotenv.j2
-            dest: "{{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_dotenv"
+        - block:
+            - name: Create new env file for scalelite run template
+              template:
+                src: dotenv.j2
+                dest: "{{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_dotenv"
 
-        - name: Copy scalelite configuration
+            - name: Copy scalelite configuration
+              command:
+                cmd: 'lxc file push {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_dotenv {{ bbb_scalelite_lxc.name }}/{{ bbb_scalelite_dir }}/.env'
+          when: bbb_scalelite_env_exists.rc != 0
+
+        - command:
+            cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- ls {{ bbb_scalelite_dir }}/data/certbot'
+          register: bbb_scalelite_certbot_installed
+          ignore_errors: true
+
+        - name: Configure Scalelite letsencrypt
           command:
-            cmd: 'lxc file push {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_dotenv {{ bbb_scalelite_lxc.name }}/{{ bbb_scalelite_dir }}/.env'
-      when: bbb_scalelite_env_exists.rc != 0
+            cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "cd {{ bbb_scalelite_dir }}; {{ item }}"'
+          with_items:
+            - "yes | ./init-letsencrypt.sh -n"
+          when: bbb_scalelite_certbot_installed.rc != 0
 
-    - command:
-        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- ls {{ bbb_scalelite_dir }}/data/certbot'
-      register: bbb_scalelite_certbot_installed
-      ignore_errors: true
+        - name: Start Scalelite (docker-compose install)
+          command:
+            cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "cd {{ bbb_scalelite_dir }}; docker compose stop; docker-compose up -d"'
 
-    - name: Configure Scalelite letsencrypt
+        - name: Provision scalelite api database (docker-compose first install)
+          command:
+            cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- docker exec -i scalelite-api bundle exec rake db:setup'
+          when: bbb_scalelite_env_exists.rc != 0
+
+      when: bbb_scalelite_install_mode == 'docker_compose'
+
+    - name: Start Scalelite (systemd install)
       command:
-        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "cd {{ bbb_scalelite_dir }}; {{ item }}"'
-      with_items:
-        - "yes | ./init-letsencrypt.sh -n"
-      when: bbb_scalelite_certbot_installed.rc != 0
+        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "systemctl restart scalelite.target"'
+      when: bbb_scalelite_install_mode == 'systemd'
 
-    - name: Start Scalelite Docker containers
+    - name: Ensure Scalelite is started before status check (systemd mode)
       command:
-        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "cd {{ bbb_scalelite_dir }}; docker compose stop; docker-compose up -d"'
+        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- sh -c "systemctl restart scalelite.target"'
+      when: bbb_scalelite_install_mode == 'systemd'
 
-    - name: Provision scalelite api database
+    - name: Wait for scalelite-api container to be running before status check (systemd mode)
       command:
-        cmd: 'lxc exec {{ bbb_scalelite_lxc.name }} -- docker exec -i scalelite-api bundle exec rake db:setup'
-      when: bbb_scalelite_env_exists.rc != 0
+        cmd: >-
+          lxc exec {{ bbb_scalelite_lxc.name }} --
+          sh -c "docker ps --format '{% raw %}{{.Names}}{% endraw %}' | grep -qx scalelite-api"
+      register: scalelite_api_running
+      retries: 20
+      delay: 3
+      until: scalelite_api_running.rc == 0
+      when: bbb_scalelite_install_mode == 'systemd'
+
+    - name: Check Scalelite status
+      include_tasks: check_scalelite_status.yml
 
     - name: Template scalelite utility bash scripts
       template:
@@ -84,10 +99,7 @@
       with_items:
         - 'meetstats'
         - 'scalelite'
-
-    - name: Check Scalelite status
-      command: 'lxc exec {{ bbb_scalelite_lxc.name }} -- docker exec -i scalelite-api bundle exec rake status'
   always:
     - name: '{{ bbb_scalelite_lxc.name }}: Remove temporary container files'
-      shell: 'rm {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_*'
+      shell: 'rm -f {{ bbb_scalelite_tmp_dir }}/scalelite_{{ bbb_scalelite_lxc.name }}_*'
       ignore_errors: true

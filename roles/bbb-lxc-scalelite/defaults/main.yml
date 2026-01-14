@@ -11,15 +11,95 @@ bbb_scalelite_lxc:
   #    multiplier: 0.5 # defaults to bbb_scalelite_lxc.default_multiplier
   #    secret: examplehash # refers to BBB API secret
 
+# Scalelite secrets (MUST be provided by the caller/playbook).
+# Generate once and keep stable across runs, e.g.:
+#   openssl rand -hex 64
+bbb_scalelite_secret_key_base: ''
+bbb_scalelite_loadbalancer_secret: ''
+
 bbb_scalelite_default_multiplier: '1.0'
 bbb_scalelite_dir: '/opt/scalelite-run'
+# docker_compose-only (scalelite-run) settings
 bbb_scalelite_git_repo: 'https://github.com/tezvi/scalelite-run.git'
+bbb_scalelite_docker_image_version: 'blindsidenetwks/scalelite:v1.6.12.1'
+bbb_scalelite_docker_recordings_image: 'bigbluebutton/bbb-playback-proxy:latest'
 bbb_scalelite_shared: '/opt/bbbshared'
 bbb_scalelite_recordings: '{{ bbb_scalelite_shared }}/scalelite-recordings'
 bbb_scalelite_recordings_spool: '{{ bbb_scalelite_recordings }}/spool'
 bbb_scalelite_spool_gid: 996
 bbb_scalelite_tmp_dir: /tmp
 bbb_scalelite_recordings_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_post_publish.rb'
+bbb_recording_notifier_script_url: 'https://raw.githubusercontent.com/bigbluebutton/bigbluebutton/e9aededaefe326be66ed1012469610d5f0d729f4/record-and-playback/core/scripts/post_publish/post_publish_recording_ready_callback.rb'
 bbb_scalelite_recordings_prune_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_prune_recordings'
-bbb_scalelite_docker_image_version: 'blindsidenetwks/scalelite:v1.5.1.7'
-bbb_scalelite_docker_recordings_image: 'bigbluebutton/bbb-playback-proxy:focal-260-alpine'
+bbb_scalelite_install_mode: systemd  # docker_compose | systemd
+
+# Docker tag used by systemd unit templates; keep compatible with existing image default.
+bbb_scalelite_tag: 'v1.6.12.1'
+
+bbb_scalelite_nginx_ssl: false
+bbb_scalelite_nginx_behind_proxy: true
+bbb_scalelite_poll_interval: 60
+
+# Extra docker options hooks (optional)
+bbb_scalelite_nginx_extra_opts: ''
+bbb_scalelite_api_extra_opts: ''
+bbb_scalelite_poller_extra_opts: ''
+bbb_scalelite_recording_importer_extra_opts: ''
+bbb_scalelite_postgres_extra_opts: ''
+bbb_scalelite_redis_extra_opts: ''
+
+# Systemd/docker network isolation
+bbb_scalelite_docker_network_name: 'scalelite'
+bbb_scalelite_docker_network_subnet: '172.30.0.0/24'
+bbb_scalelite_docker_network_gateway: '172.30.0.1'
+
+# Fixed IPs for internal containers (must be inside subnet)
+bbb_scalelite_docker_ip_api: '172.30.0.10'
+bbb_scalelite_docker_ip_nginx: '172.30.0.11'
+bbb_scalelite_docker_ip_poller: '172.30.0.12'
+bbb_scalelite_docker_ip_recording_importer: '172.30.0.13'
+
+# Fixed IPs for DB/Redis containers are optional; internal services can use docker DNS
+# (container names) on the {{ bbb_scalelite_docker_network_name }} network.
+bbb_scalelite_docker_ip_postgres: '172.30.0.20'
+bbb_scalelite_docker_ip_redis: '172.30.0.21'
+
+# Frontend reverse proxy (host-level nginx + certbot) that exposes Scalelite publicly.
+# This runs on the Scalelite LXC host OS (not inside the internal Scalelite docker network).
+bbb_scalelite_frontend_proxy_enabled: true
+bbb_scalelite_frontend_proxy_server_name: '{{ bbb_scalelite_lxc.hostname | default("") }}'
+bbb_scalelite_frontend_proxy_email: '{{ bbb_scalelite_lxc.email | default("") }}'
+
+# Nginx will proxy to the internal scalelite-nginx container over the fixed docker IP.
+# (You can change to API container if you explicitly want to bypass scalelite-nginx.)
+bbb_scalelite_frontend_proxy_upstream_ip: '{{ bbb_scalelite_docker_ip_nginx }}'
+bbb_scalelite_frontend_proxy_upstream_port: 80
+
+# Systemd install uses docker containers for postgres/redis similarly to docker-compose layout.
+# Data is stored under {{ bbb_scalelite_dir }}/data.
+bbb_scalelite_postgres_image: 'postgres:11-alpine'
+bbb_scalelite_redis_image: 'redis:7-alpine'
+
+bbb_scalelite_postgres_db: 'scalelite'
+bbb_scalelite_postgres_user: 'scalelite'
+bbb_scalelite_postgres_password: ''
+
+# Optional: override redis username/password; if password is empty, redis will run without auth.
+bbb_scalelite_redis_user: 'scalelite'
+bbb_scalelite_redis_password: ''
+
+# Scalelite protected recordings feature flag
+bbb_scalelite_protected_recordings_enabled: true
+
+# If true, deploy /root/bin/transfer_spool_recordings and cron it to rsync spool recordings
+# to the primary Scalelite host (used in multi-Scalelite setups).
+bbb_scalelite_transfer_spool_recordings_enabled: false
+bbb_scalelite_transfer_spool_recordings_target_host: ''
+bbb_scalelite_transfer_spool_recordings_spooldir: '/opt/bbbshared/scalelite-recordings/spool'
+
+# Recording prune retention (days)
+bbb_scalelite_recordings_prune_maxage_days: 7
+bbb_scalelite_recordings_prune_raw_maxage_days: 14
+
+# Redis memory limit (docker --memory). Can be overridden per environment.
+bbb_scalelite_redis_memory_limit: '500m'

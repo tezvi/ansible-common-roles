@@ -1,0 +1,13 @@
+---
+
+# Shared Scalelite readiness check.
+# Retries for up to 10 minutes when Redis is still loading data.
+
+- name: Check Scalelite status
+  command: 'lxc exec {{ bbb_scalelite_lxc.name }} -- docker exec -i scalelite-api bundle exec rake status'
+  register: scalelite_status
+  retries: 40
+  delay: 15
+  until: scalelite_status.rc == 0 or ('LOADING Redis is loading the dataset in memory' not in (scalelite_status.stderr | default('')))
+  failed_when: scalelite_status.rc != 0 and ('LOADING Redis is loading the dataset in memory' not in (scalelite_status.stderr | default('')))
+
