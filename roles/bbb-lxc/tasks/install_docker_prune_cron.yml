@@ -1,0 +1,48 @@
+---
+
+# Deploys docker_prune.sh and schedules a nightly cron job inside the LXC container.
+# This is intentionally guarded: it only runs if docker is already installed in the container.
+
+- name: '{{ lxc_instance.name }}: Check if docker is installed'
+  command:
+    cmd: 'lxc exec {{ lxc_instance.name }} -- sh -c "command -v docker"'
+  register: bbb_lxc_docker_present
+  ignore_errors: true
+
+- name: '{{ lxc_instance.name }}: Install docker prune script + cron'
+  when: bbb_lxc_docker_present.rc == 0
+  block:
+    - name: '{{ lxc_instance.name }}: Ensure Docker maintenance directory exists'
+      command:
+        cmd: 'lxc exec {{ lxc_instance.name }} -- sh -c "mkdir -p /usr/local/sbin"'
+
+    - name: '{{ lxc_instance.name }}: Render docker_prune.sh'
+      template:
+        src: docker_prune.sh
+        dest: '{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_docker_prune.sh'
+        mode: 0755
+
+    - name: '{{ lxc_instance.name }}: Push docker_prune.sh'
+      command:
+        cmd: >-
+          lxc file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_docker_prune.sh
+          {{ lxc_instance.name }}/usr/local/sbin/docker_prune.sh
+
+    - name: '{{ lxc_instance.name }}: Ensure docker_prune.sh is executable'
+      command:
+        cmd: 'lxc exec {{ lxc_instance.name }} -- chmod 0755 /usr/local/sbin/docker_prune.sh'
+
+    - name: '{{ lxc_instance.name }}: Schedule nightly docker prune cron job'
+      command:
+        cmd: >-
+          lxc exec {{ lxc_instance.name }} -- sh -ceu
+          '(
+            crontab -l 2>/dev/null | grep -v "docker_prune.sh" || true
+            echo "30 3 * * * /usr/local/sbin/docker_prune.sh -q >> /var/log/docker_prune_cron.log 2>&1"
+          ) | crontab -'
+
+  always:
+    - name: '{{ lxc_instance.name }}: Cleanup rendered docker_prune.sh'
+      shell: 'rm -f {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_docker_prune.sh'
+      ignore_errors: true
+

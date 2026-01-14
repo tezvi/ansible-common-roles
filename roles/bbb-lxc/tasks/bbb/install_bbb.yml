@@ -233,7 +233,7 @@
     - name: '{{ lxc_instance.name }}: Copy recording unit timer config file'
       template:
         src: bbb/recording-unit.timer.conf.j2
-        dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_record_systemd_timer.yml"
+        dest: "{{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_record_systemd_timer.conf"
         mode: 0644
 
     - name: '{{ lxc_instance.name }}: Offload bbb-record systemd unit out of working hours'
@@ -241,7 +241,7 @@
         cmd: 'lxc {{ item }}'
       with_items:
         - "exec {{ lxc_instance.name }} -- sh -c 'mkdir -p $(dirname {{ bbb_lxc_recording_timer_file }}) || echo \"Dir already exists\"'"
-        - 'file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_record_systemd_timer.yml {{ lxc_instance.name }}{{ bbb_lxc_recording_timer_file }}'
+        - 'file push {{ bbb_lxc_tmp_dir }}/{{ lxc_instance.name }}_record_systemd_timer.conf {{ lxc_instance.name }}{{ bbb_lxc_recording_timer_file }}'
         - 'exec {{ lxc_instance.name }} -- systemctl daemon-reload'
     when: bbb_lxc_recording_timer_enabled
 
@@ -328,6 +328,18 @@
 
   - name: '{{ lxc_instance.name }}: Check correct bbb directory ownership'
     command: "lxc exec {{ lxc_instance.name }} -- chown -R bigbluebutton:bigbluebutton /var/bigbluebutton"
+
+  # BBB tooling expects these log files to exist; if missing, it prints warnings.
+  - name: '{{ lxc_instance.name }}: Ensure expected BigBlueButton log files exist'
+    command:
+      cmd: >-
+        lxc exec {{ lxc_instance.name }} --
+        sh -ceu '
+          install -d -o bigbluebutton -g bigbluebutton /var/log/bigbluebutton;
+          for f in bbb-rap-worker.log post_process.log bbb-recording-cleanup.log; do
+            test -e "/var/log/bigbluebutton/$f" || install -m 0644 -o bigbluebutton -g bigbluebutton /dev/null "/var/log/bigbluebutton/$f";
+          done
+        '
 
   - set_fact:
       bbb_lxc_will_restart: "{{ bbb_lxc_properties_changed_stat.changed or bbb_lxc_html5_changed_stat.changed

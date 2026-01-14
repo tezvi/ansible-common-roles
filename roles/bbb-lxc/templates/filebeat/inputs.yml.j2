@@ -65,21 +65,11 @@
   prospector.scanner.exclude_files:
     - '.gz$'
   multiline.type: pattern
-  multiline.pattern: '^=== Sync started'
+  multiline.pattern: '^\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]'
   multiline.negate: true
   multiline.match: after
 
   tags: ["scalelite", "scalelite-recordings"]
-
-- type: container
-  paths:
-    - '/var/lib/docker/containers/*/*.log'
-
-  {% if bbb_lxc_filebeat_include_pattern -%}
-  include_lines: ['{{ bbb_lxc_filebeat_include_pattern }}']
-  {% endif %}
-
-  tags: ["scalelite", "docker"]
 
 {% endif %}
 
@@ -136,6 +126,25 @@
     - '.gz$'
 
   tags: ["var-logs"]
+
+- type: container
+  id: docker-containers
+  #paths:
+  #  - '/var/lib/docker/containers/*/*.log'
+  host: "unix:///var/run/docker.sock"
+  enabled: {{ 'true' if (lxc_instance.node_exporter_from_docker|default(false)|bool or lxc_instance.install_docker|default(false)|bool) else 'false' }}
+  containers.ids:
+    - '*' # Collect logs from all containers
+  processors:
+    - add_docker_metadata:
+        host: "unix:///var/run/docker.sock"
+
+  {% if bbb_lxc_filebeat_include_pattern -%}
+  include_lines: [ '{{ bbb_lxc_filebeat_include_pattern }}' ]
+  {% endif %}
+
+  tags:
+    - docker
 
 #- type: journald
 #  id: everything

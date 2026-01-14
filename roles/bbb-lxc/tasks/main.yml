@@ -17,6 +17,12 @@
   loop_control:
     loop_var: lxc_instance
 
+- name: Configure nightly docker maintenance (docker prune)
+  include_tasks: install_docker_prune_cron.yml
+  loop: '{{ bbb_lxc_instances }}'
+  loop_control:
+    loop_var: lxc_instance
+
 - include_tasks: install_bbb_instances.yml
 
 - include_tasks: install_node_exporter_instances.yml

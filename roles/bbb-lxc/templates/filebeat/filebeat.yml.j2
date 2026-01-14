@@ -173,7 +173,8 @@ processors:
   - add_host_metadata:
       when.not.contains.tags: forwarded
 #  - add_cloud_metadata: ~
-#  - add_docker_metadata: ~
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
 #  - add_kubernetes_metadata: ~
   - add_fields:
       target: ''

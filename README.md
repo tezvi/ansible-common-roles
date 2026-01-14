@@ -212,7 +212,7 @@ rabbitmq_plugins:
 
 rabbitmq_users:
   - user: "admin"
-    password: "adminpasswd"
+    password: "REPLACE_ME"
     vhost: /
     configure_priv: .*
     read_priv: .*
@@ -427,6 +427,11 @@ bbb_scalelite_lxc:
   #    multiplier: 0.5 # defaults to bbb_scalelite_lxc.default_multiplier
   #    secret: examplehash # refers to BBB API secret
 
+# Select installation method
+# - docker_compose: uses https://github.com/tezvi/scalelite-run.git (legacy behavior)
+# - systemd: installs official systemd units that run Scalelite Docker containers
+bbb_scalelite_install_mode: docker_compose  # docker_compose | systemd
+
 bbb_scalelite_default_multiplier: '1.0'
 bbb_scalelite_dir: '/opt/scalelite-run'
 bbb_scalelite_git_repo: 'https://github.com/tezvi/scalelite-run.git'
@@ -437,113 +442,22 @@ bbb_scalelite_spool_gid: 998
 bbb_scalelite_tmp_dir: /tmp
 bbb_scalelite_recordings_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_post_publish.rb'
 bbb_scalelite_recordings_prune_script_url: 'https://raw.githubusercontent.com/blindsidenetworks/scalelite/master/bigbluebutton/scalelite_prune_recordings.sh'
+
+# Required when bbb_scalelite_install_mode is "systemd"
+# These are written to /etc/default/scalelite inside the Scalelite LXC.
+# Provide real values via group_vars/host_vars (do not commit secrets).
+bbb_scalelite_database_url: 'postgresql://scalelite:REPLACE_ME@db.example.com/scalelite'
+bbb_scalelite_redis_url: 'redis://:REPLACE_ME@redis.example.com:6379/0'
+
+# Docker tag used by units (defaults match bbb_scalelite_docker_image_version)
+bbb_scalelite_tag: 'v1.6.12.1'
+
+# Optional tuning
+bbb_scalelite_nginx_ssl: true
+bbb_scalelite_nginx_behind_proxy: false
+bbb_scalelite_poll_interval: 60
+bbb_scalelite_nginx_extra_opts: ''
+bbb_scalelite_api_extra_opts: ''
+bbb_scalelite_poller_extra_opts: ''
+bbb_scalelite_recording_importer_extra_opts: ''
 ```
-
-### BigBlueButton Coturn STUN/TURN (bbb-lxc-coturn)
-Installs and configures Coturn server in a specific LXC container. Coturn server is used for TURN and STUN protocols that helps out users with firewall or network infrastructure limitations to access BBB meetings and share audio/video.
-
-Available variables:
-
-```yaml
----
-# LXC TURN container configuration
-bbb_lxc_coturn:
-# name:
-# hostname:
-# ip_address:
-# realm:
-# email:
-# secret:
-
-# Temporary directory for file tem plating and configuration
-bbb_lxc_coturn_tmp_dir: /tmp
-
-# certbot coturn deploy config file
-bbb_lxc_coturn_certbot_deploy: /etc/letsencrypt/renewal-hooks/deploy/coturn
-
-# Coturn config file path
-bbb_lxc_coturn_config_file: /etc/turnserver.conf
-
-# Coturn DHP cert file
-bbb_lxc_coturn_etc_dir: /etc/turnserver/
-
-# Coturn DHP cert file
-bbb_lxc_coturn_dhp_file: "{{ bbb_lxc_coturn_etc_dir}}/dhp.pem"
-
-# Coturn systemd unit directory
-bbb_lxc_coturn_systemd_dir: "/etc/systemd/system/coturn.service.d"
-```
-    
-### Wkhtml
-Installs webkit based PDF renderer engine. 
-
-## Example Playbook
-
-```yaml
-- name: "Provision remote server"
-  hosts:
-    - example.com
-  handlers:
-    - import_tasks: handlers/global.yml
-  connection: ssh
-  become: yes
-  become_user: root
-  become_method: sudo
-  gather_facts: yes
-  force_handlers: true
-  any_errors_fatal: true
-  vars:
-    app_user: app
-    admin_user: foobar
-    app_uid: 1000
-    server_hostname: app
-    hostname: example.com
-
-  pre_tasks:
-    - name: Update APT cache
-      apt: update_cache=yes
-
-  roles:
-    - role: common
-      vars:
-        unattended_upgrades_email: root
-    - role: apache
-      vars:
-        http_document_root: "/var/www/{{ server_hostname }}"
-        http_domain_name: example.com
-        letsencrypt_email: ssl@example.com
-        install_letsencrypt: false
-    - oracle
-    - php
-    - composer
-    - role: memcached
-      vars:
-        memcached_settings:
-          - name: m # Memory consumption
-            value: 200
-    - wkhtml
-    - redis
-    - rabbitmq
-    - supervisor
-    - postfix
-    - fail2ban
-    - role: mysql
-      vars:
-        mysql_root_password: password
-        mysql_databases:
-          - database: dbname
-            user: user
-            password: password
-            dump_file: filepath
-    - role: mediawiki-parsoid
-      vars:
-        parsoid_uri: "http://www.{{ http_domain_name }}/w/api.php"
-```
-
-## License
-
-MIT / BSD
-
-## Author Information
-
-Created in 2018 by [Andrej Vitez](https://www.andrejvitez.com/).
