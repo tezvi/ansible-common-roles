@@ -6,13 +6,37 @@
         bbb_instance_secret: "{{ bbb_node.secret|default('') }}"
         bbb_instance_url: 'https://{{ bbb_node.hostname }}/bigbluebutton/api/'
 
-    - command: 'lxc exec {{ bbb_node.lxc }} -- bbb-conf --status'
-      register: bbb_instance_installed_stat
+    # Determine if this is a remote or local LXC
+    - set_fact:
+        bbb_lxc_is_remote: "{{ bbb_node.lxc_host is defined and bbb_node.lxc_host|length > 0 }}"
+        bbb_lxc_target_host: "{{ bbb_node.lxc_host | default(inventory_hostname) }}"
       when: bbb_node.lxc is defined and bbb_node.lxc|length > 0
 
+    # Check BBB status (works for both local and remote)
+    - command: 'lxc exec {{ bbb_node.lxc }} -- bbb-conf --status'
+      delegate_to: "{{ bbb_lxc_target_host if (bbb_lxc_is_remote | default(false)) else omit }}"
+      vars:
+        ansible_user: "{{ hostvars[inventory_hostname].ansible_user | default(omit) if (bbb_lxc_is_remote | default(false)) else omit }}"
+        ansible_ssh_pass: "{{ hostvars[inventory_hostname].ansible_ssh_pass | default(omit) if (bbb_lxc_is_remote | default(false)) else omit }}"
+        ansible_ssh_private_key_file: "{{ hostvars[inventory_hostname].ansible_ssh_private_key_file | default(omit) if (bbb_lxc_is_remote | default(false)) else omit }}"
+      register: bbb_instance_installed_stat
+      when: bbb_node.lxc is defined and bbb_node.lxc|length > 0
+      ignore_errors: true
+
+    # Get secret from LXC container (works for both local and remote)
     - command: 'lxc exec {{ bbb_node.lxc }} -- sh -c "bbb-conf --secret | grep Secret: | cut -d: -f2"'
-      when: bbb_instance_installed_stat.rc is defined and bbb_instance_installed_stat.rc == 0
+      delegate_to: "{{ bbb_lxc_target_host if (bbb_lxc_is_remote | default(false)) else omit }}"
+      vars:
+        ansible_user: "{{ hostvars[inventory_hostname].ansible_user | default(omit) if (bbb_lxc_is_remote | default(false)) else omit }}"
+        ansible_ssh_pass: "{{ hostvars[inventory_hostname].ansible_ssh_pass | default(omit) if (bbb_lxc_is_remote | default(false)) else omit }}"
+        ansible_ssh_private_key_file: "{{ hostvars[inventory_hostname].ansible_ssh_private_key_file | default(omit) if (bbb_lxc_is_remote | default(false)) else omit }}"
+      when:
+        - bbb_node.lxc is defined and bbb_node.lxc|length > 0
+        - bbb_instance_installed_stat is defined
+        - bbb_instance_installed_stat.rc is defined
+        - bbb_instance_installed_stat.rc == 0
       register: bbb_instance_secret_stat
+      ignore_errors: true
 
     - set_fact:
         bbb_instance_secret: '{{ bbb_instance_secret_stat.stdout|trim }}'
@@ -20,7 +44,11 @@
 
     - fail:
         msg: |
-          Unable to determine BBB node {{ bbb_node.hostname }} API secret [lxc: {{ bbb_node.lxc|default('-') }},
+          Unable to determine BBB node {{ bbb_node.hostname }} API secret
+          [lxc: {{ bbb_node.lxc|default('-') }},
+           lxc_host: {{ bbb_node.lxc_host|default('local') }},
+           remote: {{ bbb_lxc_is_remote | default(false) }},
+           bbb_status_rc: {{ bbb_instance_installed_stat.rc | default('undefined') }},
            secret: {{ 'defined' if bbb_node.secret|default() else 'empty' }}]
       when: bbb_instance_secret is not defined or bbb_instance_secret|length == 0
 

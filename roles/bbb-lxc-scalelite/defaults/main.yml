@@ -7,9 +7,11 @@ bbb_scalelite_lxc:
   members: []
   # members:
   #  - hostname: example.com
-  #    lxc: lxcname # used if ansible controller has direct access to LXC host to automatically inspect for BBB secret
+  #    lxc: lxcname # LXC container name (required if secret not provided)
+  #    lxc_host: remote.host.com # Optional: remote host where LXC container is located (SSH required)
+  #                               # If not specified, assumes LXC container is on local ansible target host
   #    multiplier: 0.5 # defaults to bbb_scalelite_lxc.default_multiplier
-  #    secret: examplehash # refers to BBB API secret
+  #    secret: examplehash # Optional: BBB API secret (if provided, lxc lookup is skipped)
 
 # Scalelite secrets (MUST be provided by the caller/playbook).
 # Generate once and keep stable across runs, e.g.:
