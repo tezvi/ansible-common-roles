@@ -1,0 +1,73 @@
+---
+# OpenVPN Server Configuration Defaults
+
+# Server network settings
+openvpn_server_port: 1194
+openvpn_server_protocol: udp
+openvpn_server_listen: ""  # Listen address (empty = all interfaces, or set to 127.0.0.1 for localhost only)
+openvpn_server_network: "10.8.0.0"
+openvpn_server_netmask: "255.255.255.0"
+openvpn_server_device: tun
+
+# Routes to push to clients
+openvpn_push_routes:
+  - "192.168.100.0 255.255.255.0"
+
+# NAT Alias Configuration (to solve subnet conflicts)
+# Set to true to enable NAT alias subnet translation
+# Example: Access remote 192.168.x.x via 10.127.0.x (no conflicts!)
+openvpn_use_nat_alias: false
+openvpn_nat_alias_network: "10.127.0.0"
+openvpn_nat_alias_netmask: "255.255.255.0"
+openvpn_remote_lan_network: "192.168.100.0"
+
+# Network interface for NAT (auto-detected if not set)
+# For dedicated NIC to remote LAN, set openvpn_remote_lan_interface in host_vars
+openvpn_server_interface: "{{ ansible_default_ipv4.interface }}"
+
+# Easy-RSA PKI settings
+openvpn_easyrsa_country: "US"
+openvpn_easyrsa_province: "State"
+openvpn_easyrsa_city: "City"
+openvpn_easyrsa_org: "Organization"
+openvpn_easyrsa_email: "admin@example.com"
+openvpn_easyrsa_ou: "IT"
+openvpn_easyrsa_algo: "ec"
+openvpn_easyrsa_digest: "sha512"
+
+# Certificate/Key paths
+openvpn_ca_dir: "/root/openvpn-ca"
+openvpn_server_dir: "/etc/openvpn/server"
+openvpn_log_dir: "/var/log/openvpn"
+
+# Security settings
+openvpn_cipher: "AES-256-GCM"
+openvpn_auth: "SHA256"
+openvpn_tls_auth: true
+openvpn_compression: "lz4-v2"
+
+# Connection settings
+openvpn_keepalive_ping: 10
+openvpn_keepalive_timeout: 120
+openvpn_max_clients: 10
+
+# User/Group for privilege dropping
+openvpn_user: nobody
+openvpn_group: nogroup
+
+# Firewall management
+openvpn_manage_firewall: true
+# Both 'ufw' and 'iptables' are fully supported, including with NAT alias feature
+# UFW: Rules are persisted in /etc/ufw/before.rules
+# iptables: Rules are persisted via iptables-persistent package
+openvpn_firewall_type: ufw  # ufw or iptables
+
+# Enable IP forwarding
+openvpn_enable_ip_forward: true
+
+# Client-to-client communication
+openvpn_client_to_client: false
+
+# Logging verbosity (0-11)
+openvpn_log_verbosity: 3
+

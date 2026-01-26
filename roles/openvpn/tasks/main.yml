@@ -1,0 +1,157 @@
+---
+- name: Install OpenVPN and Easy-RSA
+  apt:
+    name:
+      - openvpn
+      - easy-rsa
+    state: present
+    update_cache: yes
+
+- name: Create OpenVPN directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ openvpn_ca_dir }}"
+    - "{{ openvpn_server_dir }}"
+    - "{{ openvpn_log_dir }}"
+
+- name: Enable IP forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+  when: openvpn_enable_ip_forward | bool
+
+- name: Check if Easy-RSA easyrsa script exists
+  stat:
+    path: "{{ openvpn_ca_dir }}/easyrsa"
+  register: easyrsa_script
+
+- name: Create Easy-RSA directory using make-cadir
+  command: make-cadir {{ openvpn_ca_dir }}
+  when: not easyrsa_script.stat.exists
+  register: make_cadir_result
+  failed_when: false
+
+- name: Ensure Easy-RSA directory exists (fallback)
+  file:
+    path: "{{ openvpn_ca_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Copy Easy-RSA scripts if make-cadir failed
+  shell: |
+    if [ ! -f {{ openvpn_ca_dir }}/easyrsa ]; then
+      cp -r /usr/share/easy-rsa/* {{ openvpn_ca_dir }}/
+    fi
+  args:
+    creates: "{{ openvpn_ca_dir }}/easyrsa"
+
+- name: Configure Easy-RSA variables
+  template:
+    src: easyrsa-vars.j2
+    dest: "{{ openvpn_ca_dir }}/vars"
+    mode: '0600'
+
+- name: Initialize PKI
+  command: ./easyrsa init-pki
+  args:
+    chdir: "{{ openvpn_ca_dir }}"
+    creates: "{{ openvpn_ca_dir }}/pki"
+
+- name: Check if CA exists
+  stat:
+    path: "{{ openvpn_ca_dir }}/pki/ca.crt"
+  register: ca_cert
+
+- name: Build CA (without passphrase for automation)
+  command: ./easyrsa --batch build-ca nopass
+  args:
+    chdir: "{{ openvpn_ca_dir }}"
+  when: not ca_cert.stat.exists
+
+- name: Check if server certificate exists
+  stat:
+    path: "{{ openvpn_ca_dir }}/pki/issued/server.crt"
+  register: server_cert
+
+- name: Generate server certificate request
+  command: ./easyrsa --batch gen-req server nopass
+  args:
+    chdir: "{{ openvpn_ca_dir }}"
+  when: not server_cert.stat.exists
+
+- name: Sign server certificate
+  command: ./easyrsa --batch sign-req server server
+  args:
+    chdir: "{{ openvpn_ca_dir }}"
+  when: not server_cert.stat.exists
+
+- name: Check if DH parameters exist
+  stat:
+    path: "{{ openvpn_ca_dir }}/pki/dh.pem"
+  register: dh_params
+
+- name: Generate Diffie-Hellman parameters (this may take a while)
+  command: ./easyrsa gen-dh
+  args:
+    chdir: "{{ openvpn_ca_dir }}"
+  when: not dh_params.stat.exists
+
+- name: Check if TLS auth key exists
+  stat:
+    path: "{{ openvpn_ca_dir }}/pki/ta.key"
+  register: ta_key
+
+- name: Generate TLS authentication key
+  command: openvpn --genkey secret {{ openvpn_ca_dir }}/pki/ta.key
+  when: not ta_key.stat.exists
+
+- name: Copy certificates and keys to OpenVPN directory
+  copy:
+    src: "{{ openvpn_ca_dir }}/pki/{{ item.src }}"
+    dest: "{{ openvpn_server_dir }}/{{ item.dest }}"
+    mode: "{{ item.mode }}"
+    remote_src: yes
+  loop:
+    - { src: 'ca.crt', dest: 'ca.crt', mode: '0644' }
+    - { src: 'issued/server.crt', dest: 'server.crt', mode: '0644' }
+    - { src: 'private/server.key', dest: 'server.key', mode: '0600' }
+    - { src: 'dh.pem', dest: 'dh.pem', mode: '0644' }
+    - { src: 'ta.key', dest: 'ta.key', mode: '0600' }
+
+
+- name: Deploy OpenVPN server configuration
+  template:
+    src: server.conf.j2
+    dest: "{{ openvpn_server_dir }}/server.conf"
+    mode: '0644'
+  notify: Restart OpenVPN server
+
+- name: Configure UFW firewall
+  include_tasks: firewall-ufw.yml
+  when:
+    - openvpn_manage_firewall | bool
+    - openvpn_firewall_type == 'ufw'
+
+- name: Configure iptables firewall
+  include_tasks: firewall-iptables.yml
+  when:
+    - openvpn_manage_firewall | bool
+    - openvpn_firewall_type == 'iptables'
+
+- name: Configure NAT alias subnet translation
+  include_tasks: nat-alias.yml
+  when: openvpn_use_nat_alias | default(false) | bool
+
+- name: Enable and start OpenVPN service
+  systemd:
+    name: openvpn-server@server
+    enabled: yes
+    state: started
+    daemon_reload: yes
+

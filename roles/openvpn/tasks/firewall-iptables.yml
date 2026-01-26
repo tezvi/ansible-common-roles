@@ -1,0 +1,38 @@
+---
+- name: Install iptables-persistent
+  apt:
+    name: iptables-persistent
+    state: present
+
+- name: Configure iptables NAT for OpenVPN
+  iptables:
+    table: nat
+    chain: POSTROUTING
+    source: "{{ openvpn_server_network }}/24"
+    out_interface: "{{ openvpn_server_interface }}"
+    jump: MASQUERADE
+  notify: Save iptables rules
+
+- name: Allow OpenVPN port in iptables
+  iptables:
+    chain: INPUT
+    protocol: "{{ openvpn_server_protocol }}"
+    destination_port: "{{ openvpn_server_port }}"
+    jump: ACCEPT
+  notify: Save iptables rules
+
+- name: Allow forwarding for OpenVPN
+  iptables:
+    chain: FORWARD
+    in_interface: tun+
+    jump: ACCEPT
+  notify: Save iptables rules
+
+- name: Allow established connections
+  iptables:
+    chain: FORWARD
+    match: state
+    ctstate: RELATED,ESTABLISHED
+    jump: ACCEPT
+  notify: Save iptables rules
+

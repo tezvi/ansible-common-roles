@@ -1,0 +1,59 @@
+# Example inventory configuration for OpenVPN servers
+# Create this as: inventory/group_vars/openvpn_servers.yml
+
+---
+# Server network settings
+openvpn_server_port: 1194
+openvpn_server_protocol: udp
+openvpn_server_listen: ""  # Listen address (empty = all interfaces, "127.0.0.1" for localhost/SSH tunnel)
+openvpn_server_network: "10.8.0.0"
+openvpn_server_netmask: "255.255.255.0"
+
+# NAT Alias Configuration (RECOMMENDED for subnet conflicts)
+# Enable this if your local network and remote LAN use the same subnet
+# Example: Both use 192.168.x.0/24
+openvpn_use_nat_alias: true
+openvpn_nat_alias_network: "10.127.0.0"      # Alias subnet for accessing remote LAN
+openvpn_nat_alias_netmask: "255.255.255.0"
+openvpn_remote_lan_network: "192.168.100.0"  # Actual remote LAN subnet
+
+# Routes to push to clients (use alias network when NAT alias is enabled)
+openvpn_push_routes: []  # Leave empty, NAT alias will push the route automatically
+
+# If NOT using NAT alias, push remote LAN route directly
+# openvpn_use_nat_alias: false
+# openvpn_push_routes:
+#   - "192.168.100.0 255.255.255.0"
+
+# Easy-RSA PKI settings
+openvpn_easyrsa_country: "US"
+openvpn_easyrsa_province: "State"
+openvpn_easyrsa_city: "City"
+openvpn_easyrsa_org: "MyOrganization"
+openvpn_easyrsa_email: "admin@example.com"
+openvpn_easyrsa_ou: "IT"
+
+# Security settings
+openvpn_cipher: "AES-256-GCM"
+openvpn_auth: "SHA256"
+openvpn_tls_auth: true
+openvpn_compression: "lz4-v2"
+
+# Connection settings
+openvpn_keepalive_ping: 10
+openvpn_keepalive_timeout: 120
+openvpn_max_clients: 10
+
+# Firewall management
+openvpn_manage_firewall: true
+openvpn_firewall_type: ufw  # ufw or iptables
+
+# Enable IP forwarding
+openvpn_enable_ip_forward: true
+
+# Client-to-client communication
+openvpn_client_to_client: false
+
+# Logging verbosity (0-11)
+openvpn_log_verbosity: 3
+

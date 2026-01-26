@@ -1,0 +1,43 @@
+---
+- name: Install UFW if not present
+  apt:
+    name: ufw
+    state: present
+    update_cache: yes
+
+- name: Allow OpenVPN through UFW
+  ufw:
+    rule: allow
+    port: "{{ openvpn_server_port }}"
+    proto: "{{ openvpn_server_protocol }}"
+
+- name: Check if UFW before.rules has NAT configuration
+  shell: grep -q "# OpenVPN NAT rules" /etc/ufw/before.rules
+  register: ufw_nat_check
+  changed_when: false
+  failed_when: false
+
+- name: Configure UFW NAT rules for OpenVPN
+  blockinfile:
+    path: /etc/ufw/before.rules
+    insertbefore: "^\\*filter"
+    marker: "# {mark} OpenVPN NAT rules"
+    block: |
+      *nat
+      :POSTROUTING ACCEPT [0:0]
+      -A POSTROUTING -s {{ openvpn_server_network }}/24 -o {{ openvpn_server_interface }} -j MASQUERADE
+      COMMIT
+  when: ufw_nat_check.rc != 0
+  notify: Reload UFW
+
+- name: Set UFW default forward policy to ACCEPT
+  lineinfile:
+    path: /etc/default/ufw
+    regexp: '^DEFAULT_FORWARD_POLICY='
+    line: 'DEFAULT_FORWARD_POLICY="ACCEPT"'
+  notify: Reload UFW
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+

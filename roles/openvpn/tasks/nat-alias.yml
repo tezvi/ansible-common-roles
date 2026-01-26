@@ -1,0 +1,116 @@
+---
+# Configure NAT alias subnet translation (e.g., 10.127.0.x → 192.168.x.x)
+# Supports both UFW and iptables-persistent for rule persistence
+
+- name: Install iptables-persistent for NAT alias (iptables mode only)
+  apt:
+    name: iptables-persistent
+    state: present
+  when: openvpn_firewall_type == 'iptables'
+
+- name: Add IP alias on remote LAN network (for LXC containers)
+  command: ip addr add {{ openvpn_server_remote_lan_ip }}/24 dev {{ openvpn_server_interface }}
+  when:
+    - openvpn_server_remote_lan_ip is defined
+    - openvpn_server_remote_lan_ip != ""
+  register: ip_alias_result
+  failed_when: false
+  changed_when: ip_alias_result.rc == 0
+
+- name: Make IP alias persistent (add to /etc/network/interfaces or netplan)
+  lineinfile:
+    path: /etc/network/interfaces.d/50-openvpn-alias.cfg
+    line: "    up ip addr add {{ openvpn_server_remote_lan_ip }}/24 dev {{ openvpn_server_interface }} || true"
+    create: yes
+  when:
+    - openvpn_server_remote_lan_ip is defined
+    - openvpn_server_remote_lan_ip != ""
+
+# ============================================
+# IPTABLES MODE: Direct iptables commands
+# ============================================
+
+- name: Create NETMAP rule for NAT alias translation (outgoing - destination)
+  shell: |
+    iptables -t nat -C PREROUTING -s {{ openvpn_server_network }}/24 -d {{ openvpn_nat_alias_network }}/24 -j NETMAP --to {{ openvpn_remote_lan_network }}/24 2>/dev/null || \
+    iptables -t nat -A PREROUTING -s {{ openvpn_server_network }}/24 -d {{ openvpn_nat_alias_network }}/24 -j NETMAP --to {{ openvpn_remote_lan_network }}/24
+  register: netmap_result
+  changed_when: "'iptables' in netmap_result.stdout or netmap_result.rc == 0"
+  notify: Save iptables rules
+  when: openvpn_firewall_type == 'iptables'
+
+- name: Create NETMAP rule for return traffic (incoming - source translation)
+  shell: |
+    iptables -t nat -C POSTROUTING -s {{ openvpn_remote_lan_network }}/24 -d {{ openvpn_server_network }}/24 -j NETMAP --to {{ openvpn_nat_alias_network }}/24 2>/dev/null || \
+    iptables -t nat -A POSTROUTING -s {{ openvpn_remote_lan_network }}/24 -d {{ openvpn_server_network }}/24 -j NETMAP --to {{ openvpn_nat_alias_network }}/24
+  register: netmap_return_result
+  changed_when: "'iptables' in netmap_return_result.stdout or netmap_return_result.rc == 0"
+  notify: Save iptables rules
+  when: openvpn_firewall_type == 'iptables'
+
+- name: Add MASQUERADE for VPN to remote LAN (iptables mode)
+  iptables:
+    table: nat
+    chain: POSTROUTING
+    source: "{{ openvpn_server_network }}/24"
+    destination: "{{ openvpn_remote_lan_network }}/24"
+    out_interface: "{{ openvpn_remote_lan_interface | default(omit) }}"
+    jump: MASQUERADE
+  notify: Save iptables rules
+  when: openvpn_firewall_type == 'iptables'
+
+- name: Allow forwarding from VPN to remote LAN (iptables mode)
+  iptables:
+    chain: FORWARD
+    source: "{{ openvpn_server_network }}/24"
+    destination: "{{ openvpn_remote_lan_network }}/24"
+    jump: ACCEPT
+  notify: Save iptables rules
+  when: openvpn_firewall_type == 'iptables'
+
+- name: Allow return traffic from remote LAN to VPN (iptables mode)
+  iptables:
+    chain: FORWARD
+    source: "{{ openvpn_remote_lan_network }}/24"
+    destination: "{{ openvpn_server_network }}/24"
+    match: state
+    ctstate: RELATED,ESTABLISHED
+    jump: ACCEPT
+  notify: Save iptables rules
+  when: openvpn_firewall_type == 'iptables'
+
+# ============================================
+# UFW MODE: Add rules to /etc/ufw/before.rules
+# ============================================
+
+- name: Configure UFW NAT alias rules for OpenVPN
+  blockinfile:
+    path: /etc/ufw/before.rules
+    insertbefore: "^\\*filter"
+    marker: "# {mark} OpenVPN NAT ALIAS rules"
+    block: |
+      *nat
+      :PREROUTING ACCEPT [0:0]
+      :POSTROUTING ACCEPT [0:0]
+      # NETMAP: Translate alias subnet to remote LAN (client -> remote)
+      -A PREROUTING -s {{ openvpn_server_network }}/24 -d {{ openvpn_nat_alias_network }}/24 -j NETMAP --to {{ openvpn_remote_lan_network }}/24
+      # NETMAP: Translate remote LAN back to alias subnet (remote -> client)
+      -A POSTROUTING -s {{ openvpn_remote_lan_network }}/24 -d {{ openvpn_server_network }}/24 -j NETMAP --to {{ openvpn_nat_alias_network }}/24
+      # MASQUERADE: VPN clients to remote LAN
+      -A POSTROUTING -s {{ openvpn_server_network }}/24 -d {{ openvpn_remote_lan_network }}/24 -o {{ openvpn_remote_lan_interface | default('eth0') }} -j MASQUERADE
+      COMMIT
+  notify: Reload UFW
+  when: openvpn_firewall_type == 'ufw'
+
+- name: Ensure UFW FORWARD rules for OpenVPN NAT alias
+  blockinfile:
+    path: /etc/ufw/before.rules
+    insertafter: "^\\*filter"
+    marker: "# {mark} OpenVPN FORWARD rules"
+    block: |
+      # Allow forwarding from VPN to remote LAN
+      -A ufw-before-forward -s {{ openvpn_server_network }}/24 -d {{ openvpn_remote_lan_network }}/24 -j ACCEPT
+      # Allow return traffic from remote LAN to VPN
+      -A ufw-before-forward -s {{ openvpn_remote_lan_network }}/24 -d {{ openvpn_server_network }}/24 -m state --state RELATED,ESTABLISHED -j ACCEPT
+  notify: Reload UFW
+  when: openvpn_firewall_type == 'ufw'

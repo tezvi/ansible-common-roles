@@ -1,0 +1,28 @@
+# Easy-RSA 3 configuration
+set_var EASYRSA_PKI            "{{ openvpn_ca_dir }}/pki"
+
+{% if openvpn_easyrsa_country is defined %}
+set_var EASYRSA_REQ_COUNTRY    "{{ openvpn_easyrsa_country }}"
+{% endif %}
+{% if openvpn_easyrsa_province is defined %}
+set_var EASYRSA_REQ_PROVINCE   "{{ openvpn_easyrsa_province }}"
+{% endif %}
+{% if openvpn_easyrsa_city is defined %}
+set_var EASYRSA_REQ_CITY       "{{ openvpn_easyrsa_city }}"
+{% endif %}
+{% if openvpn_easyrsa_org is defined %}
+set_var EASYRSA_REQ_ORG        "{{ openvpn_easyrsa_org }}"
+{% endif %}
+{% if openvpn_easyrsa_email is defined %}
+set_var EASYRSA_REQ_EMAIL      "{{ openvpn_easyrsa_email }}"
+{% endif %}
+{% if openvpn_easyrsa_ou is defined %}
+set_var EASYRSA_REQ_OU         "{{ openvpn_easyrsa_ou }}"
+{% endif %}
+{% if openvpn_easyrsa_algo is defined %}
+set_var EASYRSA_ALGO           "{{ openvpn_easyrsa_algo }}"
+{% endif %}
+{% if openvpn_easyrsa_digest is defined %}
+set_var EASYRSA_DIGEST         "{{ openvpn_easyrsa_digest }}"
+{% endif %}
+

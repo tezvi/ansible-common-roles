@@ -153,6 +153,66 @@ oracle_instantclient_home: "/usr/lib/oracle/12.2/client64"
 oracle_instantclient_include: "/usr/include/oracle/12.2/client64"
 ```
 
+### OpenVPN
+Installs and configures OpenVPN server with Easy-RSA PKI for certificate management. Supports NAT alias feature for accessing remote networks with conflicting subnets.
+
+**See full documentation:** [roles/openvpn/README.md](roles/openvpn/README.md)
+
+**Features:**
+- OpenVPN server with TLS authentication
+- Easy-RSA PKI for certificate generation
+- UFW or iptables firewall configuration
+- NAT alias translation for subnet conflict resolution
+- Support for TCP (SSH tunnel compatible) or UDP protocols
+- Client certificate generation
+
+**NAT Alias Feature:**
+When your local network and remote LAN use the same subnet (e.g., both 192.168.0.0/24), NAT alias allows you to access remote servers via an alias subnet (e.g., 10.127.0.x → 192.168.x.x).
+
+Available variables:
+
+```yaml
+# Server network settings
+openvpn_server_port: 1194
+openvpn_server_protocol: udp  # or tcp for SSH tunnel compatibility
+openvpn_server_listen: ""     # Listen address (empty = all interfaces, "127.0.0.1" for localhost only)
+openvpn_server_network: "10.8.0.0"
+openvpn_server_netmask: "255.255.255.0"
+
+# Routes to push to clients
+openvpn_push_routes:
+  - "192.168.100.0 255.255.255.0"
+
+# NAT Alias Configuration (for subnet conflicts)
+openvpn_use_nat_alias: false
+openvpn_nat_alias_network: "10.127.0.0"      # Alias subnet clients use
+openvpn_nat_alias_netmask: "255.255.255.0"
+openvpn_remote_lan_network: "192.168.100.0"  # Actual remote LAN subnet
+openvpn_remote_lan_interface: "eth0"         # Interface to remote LAN
+
+# Easy-RSA PKI settings
+openvpn_easyrsa_country: "US"
+openvpn_easyrsa_province: "State"
+openvpn_easyrsa_city: "City"
+openvpn_easyrsa_org: "Organization"
+openvpn_easyrsa_email: "admin@example.com"
+
+# Security settings
+openvpn_cipher: "AES-256-GCM"
+openvpn_auth: "SHA256"
+openvpn_tls_auth: true
+openvpn_compression: "none"  # Disabled for security
+
+# Connection settings
+openvpn_keepalive_ping: 10
+openvpn_keepalive_timeout: 120
+openvpn_max_clients: 10
+
+# Firewall management
+openvpn_manage_firewall: true
+openvpn_firewall_type: ufw  # ufw or iptables
+```
+
 ### PHP
 Installs and configures PHP and PHP-FPM server. Automatically configures FPM pools and connects with Apache.
 
