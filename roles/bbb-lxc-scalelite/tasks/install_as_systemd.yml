@@ -172,7 +172,7 @@
       command:
         cmd: >-
           lxc exec {{ bbb_scalelite_lxc.name }} --
-          sh -c "docker ps --format '%n' | grep -qx scalelite-api"
+          sh -c "docker ps --format '{{.Names}}' | grep -qx scalelite-api"
       register: scalelite_api_container_exists
       retries: 20
       delay: 3
