@@ -13,16 +13,18 @@
   - name: '{{ lxc_instance.name }}: Configure Filebeat apt repository'
     command: 'lxc exec {{ lxc_instance.name }} -- sh -c "{{ item }}"'
     with_items:
+      - 'rm -f /etc/apt/sources.list.d/elastic-7* || true'
       - 'wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | {{ sudo_prefix }}apt-key add -'
-      - 'apt-get -y --fix-broken install || true'
-      - 'apt-get -y install apt-transport-https'
-      - "echo 'deb https://artifacts.elastic.co/packages/7.x/apt stable main' > /etc/apt/sources.list.d/elastic-7.x.list"
+      - 'DEBIAN_FRONTEND=noninteractive dpkg --configure -a --force-confold || true'
+      - 'DEBIAN_FRONTEND=noninteractive apt-get -y --fix-broken install -o Dpkg::Options::="--force-confold" || true'
+      - 'DEBIAN_FRONTEND=noninteractive apt-get -y install apt-transport-https -o Dpkg::Options::="--force-confold"'
+      - "echo 'deb https://artifacts.elastic.co/packages/9.x/apt stable main' > /etc/apt/sources.list.d/elastic-9.x.list"
 
   - name: '{{ lxc_instance.name }}: Install and configure Filebeat service'
     command: 'lxc exec {{ lxc_instance.name }} -- sh -c "{{ item }}"'
     with_items:
       - 'apt-get update'
-      - 'apt-get install -y --force-yes filebeat'
+      - 'DEBIAN_FRONTEND=noninteractive apt-get install -y filebeat -o Dpkg::Options::="--force-confold" || DEBIAN_FRONTEND=noninteractive apt-get upgrade -y filebeat -o Dpkg::Options::="--force-confold"'
       - 'systemctl is-enabled filebeat || systemctl enable filebeat'
       - 'systemctl start filebeat'
       - 'mkdir -p /etc/filebeat/inputs.d'

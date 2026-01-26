@@ -44,7 +44,7 @@ while getopts "qanh" opt; do
 done
 shift $((OPTIND-1))
 
-LOG_DIR="$LMS_DIR/log/maintenance"
+LOG_DIR="/var/log"
 PRUNE_LOG="$LOG_DIR/docker_prune.log"
 
 # Check if log directory exists, create if not

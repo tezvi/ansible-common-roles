@@ -12,6 +12,8 @@
     - /var/log/bigbluebutton/**/*.log
     - /var/log/bbb-*/*.log
     - /var/log/kurento-media-server/*.log
+    - /var/log/turnserver/*.log
+    - /var/log/redis/*.log
 
   # Exclude files. A list of regular expressions to match. Filebeat drops the files that
   # are matching any regular expression from the list. By default, no files are dropped.
@@ -108,13 +110,17 @@
   paths:
     - /var/log/unattended-upgrades/*.log
     - /var/log/letsencrypt/*.log
+    - /var/log/fail2ban.log
+    - /var/log/mail.*
     - /var/log/lxd/*.log
     - /var/log/grafana/*.log
-    - /var/log/filebeat/filebeat
+    - /var/log/filebeat/filebeat*
     - /var/log/freeradius/*.log
     - /var/log/carnet-upgrade.log
-    - /opt/otrs/var/log/*.log
-    - /opt/otrs/var/log/Daemon/*.log
+    - /opt/otobo/var/log/**/*.log
+    - /var/log/fetchmail.log
+    - /var/log/nginx/*.log
+    - /var/log/openvpn/*.log
 
   {% if bbb_lxc_filebeat_include_pattern|default(false) -%}
   include_lines: ['{{ bbb_lxc_filebeat_include_pattern }}']
@@ -127,17 +133,18 @@
 
   tags: ["var-logs"]
 
-- type: container
-  id: docker-containers
-  #paths:
-  #  - '/var/lib/docker/containers/*/*.log'
-  host: "unix:///var/run/docker.sock"
+- type: filestream
+  format: docker
+  id: docker-containerss
+  paths:
+    - '/var/lib/docker/containers/*/*.log'
   enabled: {{ 'true' if (lxc_instance.node_exporter_from_docker|default(false)|bool or lxc_instance.install_docker|default(false)|bool) else 'false' }}
   containers.ids:
     - '*' # Collect logs from all containers
   processors:
     - add_docker_metadata:
         host: "unix:///var/run/docker.sock"
+        match_source: true
 
   {% if bbb_lxc_filebeat_include_pattern -%}
   include_lines: [ '{{ bbb_lxc_filebeat_include_pattern }}' ]

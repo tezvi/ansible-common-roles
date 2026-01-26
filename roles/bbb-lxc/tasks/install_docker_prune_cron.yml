@@ -38,7 +38,7 @@
           lxc exec {{ lxc_instance.name }} -- sh -ceu
           '(
             crontab -l 2>/dev/null | grep -v "docker_prune.sh" || true
-            echo "30 3 * * * /usr/local/sbin/docker_prune.sh -q >> /var/log/docker_prune_cron.log 2>&1"
+            echo "30 3 * * * /usr/local/sbin/docker_prune.sh -q >> /var/log/docker_prune.log 2>&1"
           ) | crontab -'
 
   always:

@@ -48,7 +48,7 @@ bbb_lxc_install_filebeat: true
 # Logstash URL that will be used as Filebeat output
 bbb_lxc_filebeat_logstash_url:
 # Default Filebeat input include_lines pattern
-bbb_lxc_filebeat_include_pattern: '(ERR|WARN|error|warn|warning|critical|urgent|fail|exception)'
+bbb_lxc_filebeat_include_pattern: '(ERR|WARN|error|warn|warning|critical|urgent|fail|exception|notice)'
 # Default Filebeat certificates directory
 bbb_lxc_filebeat_cert_dir: /etc/filebeat/certs
 # Local CA certificate file
