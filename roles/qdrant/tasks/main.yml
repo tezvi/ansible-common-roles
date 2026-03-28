@@ -1,0 +1,47 @@
+---
+- name: Assert qdrant_instances is defined and non-empty
+  assert:
+    that:
+      - qdrant_instances is defined
+      - qdrant_instances | length > 0
+    fail_msg: >
+      'qdrant_instances' must be defined with at least one entry in host_vars or group_vars.
+      Each instance needs: name, api_key, rest_port, grpc_port.
+      Example:
+        qdrant_instances:
+          - name: moodle
+            api_key: "sk-secret"
+            rest_port: 6333
+            grpc_port: 6334
+
+- name: Assert every instance has required fields
+  assert:
+    that:
+      - item.name is defined and item.name | length > 0
+      - item.api_key is defined and item.api_key | length > 0
+      - item.rest_port is defined
+      - item.grpc_port is defined
+    fail_msg: "Qdrant instance '{{ item.name | default('?') }}' is missing name, api_key, rest_port, or grpc_port."
+  loop: "{{ qdrant_instances }}"
+  loop_control:
+    label: "{{ item.name | default('?') }}"
+
+- name: Create base install directory
+  file:
+    path: "{{ qdrant_base_dir }}"
+    state: directory
+    mode: '0755'
+  tags: [qdrant, qdrant-data]
+
+- name: Deploy each Qdrant instance
+  include_tasks: deploy_instance.yml
+  loop: "{{ qdrant_instances }}"
+  loop_control:
+    loop_var: qdrant_instance
+    label: "{{ qdrant_instance.name }}"
+  when: qdrant_enabled | bool
+  tags: [qdrant, qdrant-docker]
+
+- name: Configure firewall for all instances
+  include_tasks: configure_firewall.yml
+  tags: [qdrant, qdrant-firewall]

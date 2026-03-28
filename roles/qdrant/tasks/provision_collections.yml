@@ -1,0 +1,40 @@
+---
+# Collections are created using the master API key.
+# Each collection entry's api_key is stored in .env for application reference.
+- name: Create Qdrant collections
+  uri:
+    url: "http://{{ qdrant_host }}:{{ qdrant_port }}/collections/{{ item.name }}"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      api-key: "{{ qdrant_master_api_key }}"
+    body_format: json
+    body:
+      vectors:
+        size: "{{ item.vector_size | default(1536) }}"
+        distance: "{{ item.distance | default('Cosine') }}"
+    status_code: [200, 201, 409]   # 409 = collection already exists
+  loop: "{{ qdrant_collections }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Verify collections are accessible
+  uri:
+    url: "http://{{ qdrant_host }}:{{ qdrant_port }}/collections/{{ item.name }}"
+    method: GET
+    headers:
+      api-key: "{{ qdrant_master_api_key }}"
+    status_code: 200
+  loop: "{{ qdrant_collections }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: qdrant_collection_check
+
+- name: Display collection status
+  debug:
+    msg: "Collection '{{ item.item.name }}' status: {{ item.json.result.status | default('unknown') }}"
+  loop: "{{ qdrant_collection_check.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+

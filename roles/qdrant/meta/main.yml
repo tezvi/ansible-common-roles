@@ -1,0 +1,21 @@
+---
+galaxy_info:
+  author: "ansible-common-roles"
+  description: "Deploy Qdrant vector database via Docker Compose with collection provisioning"
+  license: "MIT"
+  min_ansible_version: "2.9"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+  galaxy_tags:
+    - qdrant
+    - vector
+    - database
+    - docker
+    - ai
+    - embeddings
+dependencies: []
+

@@ -1,0 +1,113 @@
+---
+# Called in a loop with loop_var: qdrant_instance
+- name: "{{ qdrant_instance.name }} | Create instance directory"
+  file:
+    path: "{{ qdrant_base_dir }}/{{ qdrant_instance.name }}"
+    state: directory
+    mode: '0755'
+
+- name: "{{ qdrant_instance.name }} | Create data directory on host"
+  file:
+    path: "{{ qdrant_instance.data_dir }}"
+    state: directory
+    mode: '0700'
+    owner: '1000'
+    group: '1000'
+  when: qdrant_instance.data_dir is defined and qdrant_instance.data_dir is not none
+
+- name: "{{ qdrant_instance.name }} | Deploy environment file"
+  template:
+    src: qdrant.env.j2
+    dest: "{{ qdrant_base_dir }}/{{ qdrant_instance.name }}/.env"
+    mode: '0600'
+  register: _qdrant_env
+
+- name: "{{ qdrant_instance.name }} | Deploy Docker Compose file"
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ qdrant_base_dir }}/{{ qdrant_instance.name }}/docker-compose.yml"
+    mode: '0640'
+  register: _qdrant_compose
+
+- name: "{{ qdrant_instance.name }} | Recreate stack on config change"
+  community.docker.docker_compose_v2:
+    project_src: "{{ qdrant_base_dir }}/{{ qdrant_instance.name }}"
+    state: present
+    pull: missing
+  when:
+    - qdrant_restart_services | bool
+    - _qdrant_env.changed or _qdrant_compose.changed
+
+- name: "{{ qdrant_instance.name }} | Start Docker Compose stack"
+  community.docker.docker_compose_v2:
+    project_src: "{{ qdrant_base_dir }}/{{ qdrant_instance.name }}"
+    state: present
+    pull: missing
+
+- name: "{{ qdrant_instance.name }} | Wait for REST port to open"
+  wait_for:
+    host: "{{ qdrant_instance.host | default(qdrant_default_host) }}"
+    port: "{{ qdrant_instance.rest_port }}"
+    timeout: 120
+    state: started
+
+- name: "{{ qdrant_instance.name }} | Wait for API to be ready"
+  uri:
+    url: "http://{{ qdrant_instance.host | default(qdrant_default_host) }}:{{ qdrant_instance.rest_port }}/healthz"
+    method: GET
+    status_code: 200
+  register: _qdrant_health
+  until: _qdrant_health.status == 200
+  retries: 24
+  delay: 5
+
+- name: "{{ qdrant_instance.name }} | Get version info"
+  uri:
+    url: "http://{{ qdrant_instance.host | default(qdrant_default_host) }}:{{ qdrant_instance.rest_port }}/"
+    method: GET
+    headers:
+      api-key: "{{ qdrant_instance.api_key }}"
+    status_code: 200
+  register: _qdrant_info
+
+- name: "{{ qdrant_instance.name }} | Display status"
+  debug:
+    msg: "Qdrant '{{ qdrant_instance.name }}' running - version {{ _qdrant_info.json.version | default('unknown') }} on port {{ qdrant_instance.rest_port }}"
+
+- name: "{{ qdrant_instance.name }} | Create collections"
+  uri:
+    url: "http://{{ qdrant_instance.host | default(qdrant_default_host) }}:{{ qdrant_instance.rest_port }}/collections/{{ col.name }}"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      api-key: "{{ qdrant_instance.api_key }}"
+    body_format: json
+    body:
+      vectors:
+        size: "{{ col.vector_size | default(1536) }}"
+        distance: "{{ col.distance | default('Cosine') }}"
+    status_code: [200, 201, 409]
+  loop: "{{ qdrant_instance.collections | default([]) }}"
+  loop_control:
+    loop_var: col
+    label: "{{ col.name }}"
+
+- name: "{{ qdrant_instance.name }} | Verify collections"
+  uri:
+    url: "http://{{ qdrant_instance.host | default(qdrant_default_host) }}:{{ qdrant_instance.rest_port }}/collections/{{ col.name }}"
+    method: GET
+    headers:
+      api-key: "{{ qdrant_instance.api_key }}"
+  loop: "{{ qdrant_instance.collections | default([]) }}"
+  loop_control:
+    loop_var: col
+    label: "{{ col.name }}"
+  register: _qdrant_col_check
+
+- name: "{{ qdrant_instance.name }} | Display collection status"
+  debug:
+    msg: "Collection '{{ item.col.name }}' status: {{ item.json.result.status | default('unknown') }}"
+  loop: "{{ _qdrant_col_check.results }}"
+  loop_control:
+    label: "{{ item.col.name }}"
+  when: qdrant_instance.collections is defined and qdrant_instance.collections | length > 0

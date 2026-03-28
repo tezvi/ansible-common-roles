@@ -1,0 +1,72 @@
+---
+# =============================================================================
+# General Settings
+# =============================================================================
+qdrant_enabled: true
+qdrant_restart_services: true
+
+qdrant_docker_image: "qdrant/qdrant:latest"
+
+# Base install directory - each instance gets a subdirectory under this path.
+qdrant_base_dir: "/opt/qdrant"
+
+# Default bind host for all instances (override per-instance with 'host:').
+qdrant_default_host: "127.0.0.1"
+
+# =============================================================================
+# Instances
+# =============================================================================
+# Qdrant has no per-collection auth - the only way to give different apps
+# different credentials is to run separate containers, each with its own
+# api_key.  Define one entry per application that needs isolated access.
+#
+# Required per instance:
+#   name        - identifier for the container, subdirectory, etc.
+#   api_key     - the ONLY key this app uses for all requests (REQUIRED)
+#   rest_port   - host port mapped to Qdrant REST/HTTP (6333 inside container)
+#   grpc_port   - host port mapped to Qdrant gRPC (6334 inside container)
+#
+# Optional per instance:
+#   host            - bind address (default: qdrant_default_host)
+#   data_dir        - absolute host path for persistent storage
+#                     (omit or set to null for a named Docker volume)
+#   read_only_key   - optional second key with search/read-only access
+#   collections     - list of collections to create on first deploy
+#     Each collection:
+#       name         - collection name
+#       vector_size  - embedding dimensionality (default: 1536)
+#       distance     - Cosine | Euclid | Dot (default: Cosine)
+#
+# Example:
+#
+# qdrant_instances:
+#   - name: moodle
+#     api_key: "sk-moodle-secret"
+#     rest_port: 6333
+#     grpc_port: 6334
+#     data_dir: "/opt/mefai_shared/qdrant/moodle"
+#     collections:
+#       - name: course_embeddings
+#         vector_size: 1536
+#         distance: Cosine
+#
+#   - name: litellm
+#     api_key: "sk-litellm-secret"
+#     rest_port: 6335
+#     grpc_port: 6336
+#     data_dir: "/opt/mefai_shared/qdrant/litellm"
+#     collections:
+#       - name: rag_store
+#         vector_size: 768
+#         distance: Dot
+#
+# The role will FAIL if this list is empty or any entry is missing api_key.
+qdrant_instances: []
+
+# =============================================================================
+# Firewall
+# =============================================================================
+qdrant_configure_firewall: true
+# Source networks allowed to reach all Qdrant REST ports.
+# Empty list = deny all inbound on those ports.
+qdrant_allowed_networks: []

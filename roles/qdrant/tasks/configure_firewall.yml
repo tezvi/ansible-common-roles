@@ -1,0 +1,38 @@
+---
+- name: Allow Qdrant REST port from permitted networks
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.1 }}"
+    proto: tcp
+    from_ip: "{{ item.0 }}"
+    comment: "Qdrant {{ qdrant_item.name }} REST from {{ item.0 }}"
+  vars:
+    qdrant_item: "{{ qdrant_instances | selectattr('rest_port', 'equalto', item.1) | first }}"
+  loop: "{{ qdrant_allowed_networks | product(qdrant_instances | map(attribute='rest_port') | list) | list }}"
+  loop_control:
+    label: "port {{ item.1 }} from {{ item.0 }}"
+  when: qdrant_configure_firewall | bool and qdrant_allowed_networks | length > 0
+
+- name: Deny Qdrant REST ports from all other sources
+  community.general.ufw:
+    rule: deny
+    port: "{{ instance.rest_port }}"
+    proto: tcp
+    comment: "Qdrant {{ instance.name }} REST deny default"
+  loop: "{{ qdrant_instances }}"
+  loop_control:
+    loop_var: instance
+    label: "{{ instance.name }} REST :{{ instance.rest_port }}"
+  when: qdrant_configure_firewall | bool
+
+- name: Deny Qdrant gRPC ports from all sources
+  community.general.ufw:
+    rule: deny
+    port: "{{ instance.grpc_port }}"
+    proto: tcp
+    comment: "Qdrant {{ instance.name }} gRPC deny default"
+  loop: "{{ qdrant_instances }}"
+  loop_control:
+    loop_var: instance
+    label: "{{ instance.name }} gRPC :{{ instance.grpc_port }}"
+  when: qdrant_configure_firewall | bool

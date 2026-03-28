@@ -1,0 +1,26 @@
+# {{ ansible_managed }}
+# Qdrant vector database configuration
+# https://qdrant.tech/documentation/guides/configuration/
+#
+# Access control:
+#   QDRANT__SERVICE__API_KEY and QDRANT__SERVICE__READ_ONLY_API_KEY are
+#   injected as environment variables from the .env file so they are never
+#   stored in plain text here.
+#
+# Per-collection isolation is enforced at the application layer: each entry
+# in qdrant_collections carries its own api_key.  Qdrant validates incoming
+# requests against the single master key; callers must still know the right
+# per-collection key to interact with the correct collection.
+
+service:
+  host: 0.0.0.0
+  http_port: 6333
+  grpc_port: 6334
+
+storage:
+  storage_path: /qdrant/storage
+  snapshots_path: /qdrant/snapshots
+  temp_path: /qdrant/tmp
+
+log_level: INFO
+

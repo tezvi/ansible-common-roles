@@ -1,0 +1,27 @@
+---
+# Qdrant Vector Database Deployment Playbook
+#
+# Usage:
+#   ansible-playbook playbooks/qdrant.yml -i inventory/hosts.ini -l node19.bbb.lms.mef.hr
+#
+# Required variables (set in host_vars or group_vars, never in plaintext here):
+#   - qdrant_instances   List of instances - each gets its own container and API key.
+#
+# Optional:
+#   - qdrant_allowed_networks   List of CIDR networks allowed through firewall
+- name: Deploy Qdrant vector database
+  hosts: all
+  become: yes
+  gather_facts: yes
+  pre_tasks:
+    - name: Display deployment info
+      debug:
+        msg:
+          - "Deploying Qdrant to: {{ inventory_hostname }}"
+          - "Base directory: {{ qdrant_base_dir }}"
+          - "Instances: {{ qdrant_instances | map(attribute='name') | list | join(', ') }}"
+          - "Firewall: {{ qdrant_configure_firewall | default(true) }}"
+
+  roles:
+    - role: qdrant
+

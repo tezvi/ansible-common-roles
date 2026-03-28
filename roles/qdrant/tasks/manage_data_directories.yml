@@ -1,0 +1,11 @@
+---
+- name: Create Qdrant data directory on host
+  file:
+    path: "{{ qdrant_data_dir }}"
+    state: directory
+    mode: '0700'
+    # Qdrant container runs as uid 1000
+    owner: '1000'
+    group: '1000'
+  when: qdrant_data_dir is not none
+

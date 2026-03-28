@@ -1,0 +1,34 @@
+# {{ ansible_managed }}
+# docker-compose for Qdrant vector database
+# Managed by Ansible - do not edit manually
+
+services:
+  qdrant:
+    image: {{ qdrant_docker_image }}
+    container_name: qdrant_{{ qdrant_instance.name }}
+    restart: always
+    ports:
+      - "{{ qdrant_instance.host | default(qdrant_default_host) }}:{{ qdrant_instance.rest_port }}:6333"
+      - "{{ qdrant_instance.host | default(qdrant_default_host) }}:{{ qdrant_instance.grpc_port }}:6334"
+    volumes:
+{% if qdrant_instance.data_dir is defined and qdrant_instance.data_dir is not none %}
+      - {{ qdrant_instance.data_dir }}:/qdrant/storage
+{% else %}
+      - qdrant_{{ qdrant_instance.name }}_data:/qdrant/storage
+{% endif %}
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333 && printf \"GET /healthz HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3 && grep -q \"200 OK\" <&3'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    environment:
+      QDRANT__LOG_LEVEL: INFO
+
+{% if qdrant_instance.data_dir is not defined or qdrant_instance.data_dir is none %}
+volumes:
+  qdrant_{{ qdrant_instance.name }}_data:
+    name: qdrant_{{ qdrant_instance.name }}_data
+{% endif %}

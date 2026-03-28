@@ -1,0 +1,69 @@
+---
+- name: Create Qdrant install directory
+  file:
+    path: "{{ qdrant_install_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Deploy Qdrant config file
+  template:
+    src: qdrant-config.yaml.j2
+    dest: "{{ qdrant_install_dir }}/config.yaml"
+    mode: '0640'
+  notify: recreate qdrant
+
+- name: Deploy Qdrant environment file
+  template:
+    src: qdrant.env.j2
+    dest: "{{ qdrant_install_dir }}/.env"
+    mode: '0600'
+  notify: recreate qdrant
+
+- name: Deploy Docker Compose file
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ qdrant_install_dir }}/docker-compose.yml"
+    mode: '0640'
+  notify: recreate qdrant
+
+- name: Flush handlers before health check
+  meta: flush_handlers
+
+- name: Start Qdrant Docker Compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ qdrant_install_dir }}"
+    state: present
+    pull: missing
+
+- name: Wait for Qdrant REST port to open
+  wait_for:
+    host: "{{ qdrant_host }}"
+    port: "{{ qdrant_port }}"
+    timeout: 120
+    state: started
+
+- name: Wait for Qdrant API to be ready
+  uri:
+    url: "http://{{ qdrant_host }}:{{ qdrant_port }}/healthz"
+    method: GET
+    status_code: 200
+  register: qdrant_health
+  until: qdrant_health.status == 200
+  retries: 24
+  delay: 5
+
+- name: Get Qdrant version info
+  uri:
+    url: "http://{{ qdrant_host }}:{{ qdrant_port }}/"
+    method: GET
+    headers:
+      api-key: "{{ qdrant_master_api_key }}"
+    status_code: 200
+  register: qdrant_info
+
+- name: Display Qdrant status
+  debug:
+    msg: "Qdrant is running - version {{ qdrant_info.json.version | default('unknown') }}"
+
+
+
