@@ -4,3 +4,4 @@ inventory/hosts
 ansible.log!
 /inventory/hosts.ini
 ansible.local.cfg
+ansible.log

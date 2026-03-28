@@ -17,6 +17,13 @@
   loop_control:
     loop_var: lxc_instance
 
+- name: Install docker in LXC instances
+  include_tasks: install_docker.yml
+  loop: '{{ bbb_lxc_instances }}'
+  when: lxc_instance.install_docker | default(bbb_lxc_install_docker)
+  loop_control:
+    loop_var: lxc_instance
+
 - name: Configure nightly docker maintenance (docker prune)
   include_tasks: install_docker_prune_cron.yml
   loop: '{{ bbb_lxc_instances }}'
