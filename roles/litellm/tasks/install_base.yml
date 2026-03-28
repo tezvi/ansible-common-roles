@@ -1,0 +1,39 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install required system packages
+  apt:
+    name:
+      - nginx
+      - certbot
+      - python3-certbot-nginx
+      - python3
+      - python3-docker
+      - curl
+      - ca-certificates
+      - gnupg
+      - ufw
+    state: present
+- name: Ensure ports 80 and 443 are open in UFW
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "80"
+    - "443"
+  when: litellm_configure_firewall | bool
+- name: Enable UFW
+  ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+  when: litellm_configure_firewall | bool
+- name: Allow SSH in UFW
+  ufw:
+    rule: allow
+    name: OpenSSH
+  when: litellm_configure_firewall | bool

@@ -1,0 +1,40 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+- name: restart nginx
+  systemd:
+    name: nginx
+    state: restarted
+  when: litellm_restart_services | bool
+- name: reload nginx
+  systemd:
+    name: nginx
+    state: reloaded
+  when: litellm_restart_services | bool
+- name: recreate ollama
+  community.docker.docker_compose_v2:
+    project_src: "{{ ollama_install_dir }}"
+    state: present
+    pull: missing
+  when: litellm_restart_services | bool
+- name: restart ollama
+  community.docker.docker_compose_v2:
+    project_src: "{{ ollama_install_dir }}"
+    services:
+      - ollama
+    state: restarted
+  when: litellm_restart_services | bool
+- name: recreate litellm
+  community.docker.docker_compose_v2:
+    project_src: "{{ litellm_install_dir }}"
+    state: present
+    pull: missing
+  when: litellm_restart_services | bool
+- name: restart litellm
+  community.docker.docker_compose_v2:
+    project_src: "{{ litellm_install_dir }}"
+    services:
+      - litellm
+    state: restarted
+  when: litellm_restart_services | bool

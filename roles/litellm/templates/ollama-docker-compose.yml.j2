@@ -1,0 +1,43 @@
+# {{ ansible_managed }}
+services:
+  ollama:
+    image: docker.io/ollama/ollama:latest
+    container_name: ollama
+    restart: always
+    pull_policy: always
+    tty: true
+    volumes:
+{% if ollama_models_dir is not none %}
+      - {{ ollama_models_dir }}:/root/.ollama/models
+{% else %}
+      - ollama_data:/root/.ollama
+{% endif %}
+    healthcheck:
+      test: ["CMD-SHELL", "OLLAMA_HOST=http://127.0.0.1:11434 ollama list || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 120s
+    environment:
+      OLLAMA_HOST: "0.0.0.0"
+      OLLAMA_KEEP_ALIVE: "24h"
+      OLLAMA_NUM_PARALLEL: "{{ ollama_num_parallel }}"
+      OLLAMA_MAX_LOADED_MODELS: "{{ ollama_max_loaded_models }}"
+{% if ollama_num_threads is defined %}
+      OLLAMA_NUM_THREAD: "{{ ollama_num_threads }}"
+{% endif %}
+{% if ollama_numa_enabled %}
+      OLLAMA_NUMA: "true"
+{% endif %}
+    networks:
+      - ollama-docker
+
+networks:
+  ollama-docker:
+    name: ollama-docker
+    driver: bridge
+{% if ollama_models_dir is none %}
+volumes:
+  ollama_data:
+    name: ollama_data
+{% endif %}

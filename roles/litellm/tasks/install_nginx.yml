@@ -1,0 +1,49 @@
+---
+# Nginx installation and configuration tasks
+- name: Ensure Nginx is installed
+  apt:
+    name: nginx
+    state: present
+
+- name: Check if SSL certificate already exists
+  stat:
+    path: "/etc/letsencrypt/live/{{ litellm_domain }}/fullchain.pem"
+  register: nginx_ssl_cert_check
+
+- name: Set cert exists fact for nginx template rendering
+  set_fact:
+    litellm_cert_exists: "{{ nginx_ssl_cert_check.stat.exists }}"
+
+- name: Configure Nginx worker processes
+  lineinfile:
+    path: /etc/nginx/nginx.conf
+    regexp: '^worker_processes'
+    line: "worker_processes {{ nginx_worker_processes }};"
+  notify: reload nginx
+
+- name: Remove default Nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: restart nginx
+
+- name: Deploy Nginx configuration for LiteLLM
+  template:
+    src: nginx-litellm.conf.j2
+    dest: /etc/nginx/sites-available/litellm
+    mode: '0644'
+  notify: restart nginx
+- name: Enable LiteLLM Nginx site
+  file:
+    src: /etc/nginx/sites-available/litellm
+    dest: /etc/nginx/sites-enabled/litellm
+    state: link
+  notify: restart nginx
+- name: Test Nginx configuration
+  command: nginx -t
+  changed_when: false
+- name: Enable and start Nginx service
+  systemd:
+    name: nginx
+    enabled: yes
+    state: started

@@ -1,0 +1,159 @@
+---
+- name: Create LiteLLM install directory
+  file:
+    path: "{{ litellm_install_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Create LiteLLM config directory
+  file:
+    path: "{{ litellm_config_dir }}"
+    state: directory
+    mode: '0750'
+
+- name: Create LiteLLM install directory
+  file:
+    path: "{{ litellm_pg_data_dir }}"
+    state: directory
+    mode: '0700'
+    owner: '999'
+    group: '999'
+  when: litellm_pg_data_dir | length > 0
+
+- name: Fix ownership of PostgreSQL data directory contents
+  shell: chown -R 999:999 "{{ litellm_pg_data_dir }}"
+  changed_when: false
+  when: litellm_pg_data_dir | length > 0
+
+- name: Deploy LiteLLM config.yaml
+  template:
+    src: litellm-config.yaml.j2
+    dest: "{{ litellm_config_dir }}/config.yaml"
+    mode: '0640'
+  notify: recreate litellm
+
+- name: Deploy Docker Compose file
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ litellm_install_dir }}/docker-compose.yml"
+    mode: '0640'
+  notify: recreate litellm
+
+- name: Deploy LiteLLM environment file
+  template:
+    src: litellm.env.j2
+    dest: "{{ litellm_install_dir }}/.env"
+    mode: '0600'
+  notify: recreate litellm
+
+- name: Flush handlers before health check
+  meta: flush_handlers
+
+- name: Start Docker Compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ litellm_install_dir }}"
+    state: present
+    pull: missing
+
+- name: Wait for LiteLLM port to open
+  wait_for:
+    host: "{{ litellm_host }}"
+    port: "{{ litellm_port }}"
+    timeout: 360
+    state: started
+
+- name: Wait for LiteLLM to be ready
+  uri:
+    url: "http://{{ litellm_host }}:{{ litellm_port }}/health"
+    method: GET
+    status_code: [200, 401]
+  register: litellm_health
+  until: litellm_health.status in [200, 401]
+  retries: 36
+  delay: 10
+
+- name: Display LiteLLM status
+  debug:
+    msg: "LiteLLM is {{ 'running' if litellm_health.status | default(0) in [200, 401] else 'not responding' }}"
+
+- name: Verify chat models are registered in LiteLLM
+  uri:
+    url: "http://{{ litellm_host }}:{{ litellm_port }}/v1/models"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ litellm_master_key }}"
+    status_code: 200
+  register: _litellm_models
+  retries: 6
+  delay: 10
+  until: _litellm_models.status == 200
+  when: ollama_models | length > 0 or ollama_embedding_models | length > 0
+
+- name: Display registered LiteLLM models
+  debug:
+    msg: >-
+      Registered models: {{ _litellm_models.json.data | map(attribute='id') | list }}
+  when: _litellm_models is defined and _litellm_models.json is defined
+
+- name: Register missing chat models via LiteLLM API
+  uri:
+    url: "http://{{ litellm_host }}:{{ litellm_port }}/model/new"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ litellm_master_key }}"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      model_name: "{{ item }}"
+      litellm_params:
+        model: "ollama/{{ item }}"
+        api_base: "http://ollama:{{ ollama_port }}"
+        request_timeout: "{{ litellm_request_timeout }}"
+    status_code: [200, 201]
+  loop: "{{ ollama_models }}"
+  when:
+    - ollama_models | length > 0
+    - _litellm_models is defined
+    - item not in (_litellm_models.json.data | map(attribute='id') | list)
+
+- name: Register missing embedding models via LiteLLM API
+  uri:
+    url: "http://{{ litellm_host }}:{{ litellm_port }}/model/new"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ litellm_master_key }}"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      model_name: "{{ item }}"
+      litellm_params:
+        model: "ollama/{{ item }}"
+        api_base: "http://ollama:{{ ollama_port }}"
+        request_timeout: "{{ litellm_request_timeout }}"
+      model_info:
+        mode: "embedding"
+    status_code: [200, 201]
+  loop: "{{ ollama_embedding_models }}"
+  when:
+    - ollama_embedding_models | length > 0
+    - _litellm_models is defined
+    - item not in (_litellm_models.json.data | map(attribute='id') | list)
+
+- name: Re-fetch LiteLLM models after registration
+  uri:
+    url: "http://{{ litellm_host }}:{{ litellm_port }}/v1/models"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ litellm_master_key }}"
+    status_code: 200
+  register: _litellm_models_final
+  when: ollama_embedding_models | length > 0 and _litellm_models is defined
+
+- name: Check embedding models are registered
+  assert:
+    that: item in (_litellm_models_final.json.data | map(attribute='id') | list)
+    fail_msg: "Embedding model '{{ item }}' could not be registered in LiteLLM."
+    success_msg: "Embedding model '{{ item }}' is registered in LiteLLM."
+  loop: "{{ ollama_embedding_models }}"
+  when: ollama_embedding_models | length > 0 and _litellm_models_final is defined
+

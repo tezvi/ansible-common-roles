@@ -1,0 +1,17 @@
+---
+# Ollama configuration and optimization tasks
+- name: Verify Ollama API is responding
+  uri:
+    url: "http://{{ ollama_host }}:{{ ollama_port }}/api/tags"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: ollama_test
+  retries: 3
+  delay: 5
+  until: ollama_test.status == 200
+  ignore_errors: true
+
+- name: Display Ollama test result
+  debug:
+    msg: "Ollama API test {{ 'passed' if ollama_test.status is defined and ollama_test.status == 200 else 'failed' }}"

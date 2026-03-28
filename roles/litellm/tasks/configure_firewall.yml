@@ -1,0 +1,54 @@
+---
+- name: Ensure UFW is installed
+  apt:
+    name: ufw
+    state: present
+- name: Allow SSH through UFW
+  ufw:
+    rule: allow
+    name: OpenSSH
+- name: Allow HTTP through UFW
+  ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+- name: Allow HTTPS through UFW
+  ufw:
+    rule: allow
+    port: "443"
+    proto: tcp
+- name: Block external access to LiteLLM port
+  ufw:
+    rule: deny
+    port: "{{ litellm_port }}"
+    proto: tcp
+    from_ip: any
+- name: Allow localhost access to LiteLLM port
+  ufw:
+    rule: allow
+    port: "{{ litellm_port }}"
+    proto: tcp
+    from_ip: 127.0.0.1
+- name: Block external access to PostgreSQL port
+  ufw:
+    rule: deny
+    port: "5432"
+    proto: tcp
+    from_ip: any
+  when: litellm_db_enabled | bool
+- name: Allow localhost access to PostgreSQL port
+  ufw:
+    rule: allow
+    port: "5432"
+    proto: tcp
+    from_ip: 127.0.0.1
+  when: litellm_db_enabled | bool
+- name: Enable UFW with default deny incoming
+  ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+- name: Allow outgoing traffic by default
+  ufw:
+    policy: allow
+    direction: outgoing

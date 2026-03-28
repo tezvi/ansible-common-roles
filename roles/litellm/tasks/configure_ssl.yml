@@ -1,0 +1,60 @@
+---
+# SSL configuration with Certbot tasks
+- name: Check if SSL certificate already exists
+  stat:
+    path: "/etc/letsencrypt/live/{{ litellm_domain }}/fullchain.pem"
+  register: ssl_cert
+
+- name: Set cert exists fact
+  set_fact:
+    litellm_cert_exists: "{{ ssl_cert.stat.exists }}"
+
+- name: Obtain SSL certificate using Certbot
+  command: >
+    certbot certonly --nginx
+    --non-interactive
+    --agree-tos
+    --email {{ litellm_letsencrypt_email }}
+    --domains {{ litellm_domain }}
+  when: not ssl_cert.stat.exists
+  notify: reload nginx
+
+- name: Set cert exists fact after certbot run
+  set_fact:
+    litellm_cert_exists: true
+  when: not ssl_cert.stat.exists
+
+- name: Re-deploy Nginx configuration with SSL block now that cert exists
+  template:
+    src: nginx-litellm.conf.j2
+    dest: /etc/nginx/sites-available/litellm
+    mode: '0644'
+  notify: reload nginx
+
+- name: Ensure Certbot auto-renewal timer is enabled
+  systemd:
+    name: certbot.timer
+    enabled: yes
+    state: started
+- name: Add Certbot renewal hook to reload Nginx
+  copy:
+    content: |
+      #!/bin/bash
+      systemctl reload nginx
+    dest: /etc/letsencrypt/renewal-hooks/post/reload-nginx.sh
+    mode: '0755'
+- name: Verify SSL certificate is valid
+  uri:
+    url: "https://{{ litellm_domain }}/health/liveness"
+    method: GET
+    status_code: 200
+    validate_certs: yes
+  register: ssl_test
+  retries: 3
+  delay: 5
+  until: ssl_test.status == 200
+  ignore_errors: yes
+  when: ssl_cert.stat.exists or not ssl_cert.stat.exists
+- name: Display SSL status
+  debug:
+    msg: "SSL certificate is {{ 'valid and working' if ssl_test.status | default(0) == 200 else 'not yet verified' }}"

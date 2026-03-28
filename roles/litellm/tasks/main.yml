@@ -1,0 +1,33 @@
+---
+- name: Include base system installation tasks
+  include_tasks: install_base.yml
+  tags: [litellm, litellm-base]
+
+- name: Include data directory management tasks
+  include_tasks: manage_data_directories.yml
+  tags: [litellm, litellm-data-dirs]
+
+- name: Include Ollama Docker deployment tasks
+  include_tasks: deploy_ollama.yml
+  when: ollama_enabled | bool
+  tags: [litellm, litellm-ollama]
+
+- name: Include Docker Compose deployment tasks
+  include_tasks: deploy_docker.yml
+  when: litellm_enabled | bool
+  tags: [litellm, litellm-docker]
+
+- name: Include Nginx installation tasks
+  include_tasks: install_nginx.yml
+  when: nginx_enabled | bool
+  tags: [litellm, litellm-nginx]
+
+- name: Include SSL configuration tasks
+  include_tasks: configure_ssl.yml
+  when: litellm_ssl_enabled | bool and nginx_enabled | bool
+  tags: [litellm, litellm-ssl]
+
+- name: Include firewall configuration tasks
+  include_tasks: configure_firewall.yml
+  when: litellm_configure_firewall | bool
+  tags: [litellm, litellm-firewall]

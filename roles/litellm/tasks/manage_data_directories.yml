@@ -1,0 +1,14 @@
+---
+- name: Create Ollama models directory
+  file:
+    path: "{{ ollama_models_dir }}"
+    state: directory
+    mode: '0755'
+  when: ollama_models_dir is not none
+
+- name: Create PostgreSQL data directory
+  file:
+    path: "{{ litellm_pg_data_dir }}"
+    state: directory
+    mode: '0700'
+  when: litellm_pg_data_dir | length > 0

@@ -1,0 +1,65 @@
+# {{ ansible_managed }}
+# LiteLLM Proxy Configuration
+# https://docs.litellm.ai/docs/proxy/configs
+
+model_list:
+{% for model in ollama_models %}
+  - model_name: "{{ model }}"
+    litellm_params:
+      model: "ollama/{{ model }}"
+      api_base: "http://ollama:{{ ollama_port }}"
+      request_timeout: {{ litellm_request_timeout }}
+{% endfor %}
+{% for model in ollama_embedding_models %}
+  - model_name: "{{ model }}"
+    litellm_params:
+      model: "ollama/{{ model }}"
+      api_base: "http://ollama:{{ ollama_port }}"
+      request_timeout: {{ litellm_request_timeout }}
+    model_info:
+      mode: embedding
+{% endfor %}
+{% if litellm_fallback_enabled and litellm_fallback_api_key %}
+  - model_name: "{{ litellm_fallback_model_name }}"
+    litellm_params:
+      model: "{{ litellm_fallback_provider }}/{{ litellm_fallback_model_name }}"
+      api_key: "{{ litellm_fallback_api_key }}"
+{% if litellm_fallback_api_base %}
+      api_base: "{{ litellm_fallback_api_base }}"
+{% endif %}
+      request_timeout: {{ litellm_request_timeout }}
+{% endif %}
+{% for model in litellm_additional_models %}
+  - model_name: "{{ model.model_name }}"
+    litellm_params:
+{% for key, value in model.litellm_params.items() %}
+      {{ key }}: {{ value | to_json if value is mapping or value is iterable and value is not string else value }}
+{% endfor %}
+{% endfor %}
+
+router_settings:
+  # On timeout or error, automatically fall back to the next model in the list
+  routing_strategy: "least-busy"
+  num_retries: 2
+  timeout: {{ litellm_request_timeout }}
+  allowed_fails: 3
+{% if ollama_models | length > 1 %}
+  # Fallback chain: each model falls back to the next one in the list
+  fallbacks:
+{% for model in ollama_models[:-1] %}
+    - "{{ model }}": ["{{ ollama_models[loop.index] }}"]
+{% endfor %}
+{% if litellm_fallback_enabled and litellm_fallback_api_key %}
+    - "{{ ollama_models[-1] }}": ["{{ litellm_fallback_model_name }}"]
+{% endif %}
+{% endif %}
+
+general_settings:
+  master_key: "{{ litellm_master_key }}"
+  drop_params: {{ litellm_drop_params | lower }}
+  store_model_in_db: true
+
+litellm_settings:
+  set_verbose: {{ litellm_set_verbose | lower }}
+  drop_params: {{ litellm_drop_params | lower }}
+  request_timeout: {{ litellm_request_timeout }}

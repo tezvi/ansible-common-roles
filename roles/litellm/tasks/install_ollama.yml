@@ -1,0 +1,68 @@
+---
+# Ollama installation tasks
+- name: Check if Ollama is already installed
+  stat:
+    path: /usr/local/bin/ollama
+  register: ollama_binary
+- name: Download and install Ollama
+  shell: curl -fsSL {{ ollama_install_script_url }} | sh
+  args:
+    creates: /usr/local/bin/ollama
+  when: not ollama_binary.stat.exists
+- name: Create Ollama log directory
+  file:
+    path: "{{ ollama_log_dir }}"
+    state: directory
+    owner: ollama
+    group: ollama
+    mode: '0755'
+
+- name: Deploy Ollama logrotate config
+  template:
+    src: logrotate-ollama.j2
+    dest: /etc/logrotate.d/ollama
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Ensure Ollama service directory exists
+  file:
+    path: /etc/systemd/system/ollama.service.d
+    state: directory
+    mode: '0755'
+- name: Create Ollama systemd override for environment variables
+  template:
+    src: ollama-override.conf.j2
+    dest: /etc/systemd/system/ollama.service.d/override.conf
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart ollama
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+- name: Enable and start Ollama service
+  systemd:
+    name: ollama
+    enabled: yes
+    state: started
+- name: Wait for Ollama to be ready
+  uri:
+    url: "http://{{ ollama_host }}:{{ ollama_port }}/api/tags"
+    method: GET
+    status_code: 200
+  register: result
+  until: result.status == 200
+  retries: 30
+  delay: 2
+- name: Pull required Ollama models
+  command: ollama pull {{ item }}
+  loop: "{{ ollama_models }}"
+  register: pull_result
+  changed_when: "'already exists' not in pull_result.stdout"
+  retries: 3
+  delay: 10
+  until: pull_result.rc == 0
+  when: ollama_models | length > 0
+
+

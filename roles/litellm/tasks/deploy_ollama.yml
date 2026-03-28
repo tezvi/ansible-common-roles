@@ -1,0 +1,48 @@
+---
+- name: Create Ollama install directory
+  file:
+    path: "{{ ollama_install_dir }}"
+    state: directory
+    mode: '0755'
+- name: Create Ollama models directory
+  file:
+    path: "{{ ollama_models_dir }}"
+    state: directory
+    mode: '0755'
+  when: ollama_models_dir is not none
+- name: Deploy Ollama Docker Compose file
+  template:
+    src: ollama-docker-compose.yml.j2
+    dest: "{{ ollama_install_dir }}/docker-compose.yml"
+    mode: '0640'
+  notify: recreate ollama
+- name: Flush handlers before Ollama health check
+  meta: flush_handlers
+- name: Start Ollama Docker Compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ ollama_install_dir }}"
+    state: present
+    pull: missing
+- name: Wait for Ollama container to be running
+  community.docker.docker_container_info:
+    name: ollama
+  register: ollama_container_info
+  until: ollama_container_info.container.State.Running | default(false)
+  retries: 30
+  delay: 5
+
+- name: Wait for Ollama API to be ready inside container
+  community.docker.docker_container_exec:
+    container: ollama
+    command: ollama list
+  register: ollama_health
+  until: ollama_health.rc == 0
+  retries: 30
+  delay: 5
+  changed_when: false
+- name: Pull required Ollama models
+  community.docker.docker_container_exec:
+    container: ollama
+    command: ollama pull {{ item }}
+  loop: "{{ ollama_models + ollama_embedding_models }}"
+  when: (ollama_models + ollama_embedding_models) | length > 0

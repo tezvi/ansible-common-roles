@@ -1,0 +1,96 @@
+---
+# =============================================================================
+# General Settings
+# =============================================================================
+litellm_enabled: true
+litellm_restart_services: true
+
+# =============================================================================
+# Domain and SSL Settings
+# =============================================================================
+litellm_domain: "api.example.com"
+litellm_letsencrypt_email: "ssl@example.com"
+litellm_ssl_enabled: true
+
+# =============================================================================
+# Ollama Settings
+# =============================================================================
+ollama_enabled: true
+ollama_install_dir: "/opt/ollama"
+ollama_port: 11434
+ollama_models: []
+
+# Embedding-only models served by Ollama.
+# These are exposed via /v1/embeddings under the model name "embed/<model>".
+# They are NOT included in the chat model_list or fallback chain.
+ollama_embedding_models: []
+
+ollama_numa_enabled: true
+ollama_max_loaded_models: 1
+ollama_num_parallel: 4
+
+# Ollama models directory - bind-mounted into the container
+# null = use a named Docker volume instead
+ollama_models_dir: null
+
+# =============================================================================
+# LiteLLM Settings
+# =============================================================================
+litellm_install_dir: "/opt/litellm"
+litellm_host: "127.0.0.1"
+litellm_port: 4000
+litellm_docker_image: "docker.litellm.ai/berriai/litellm:main-stable"
+
+# Master key for proxy authentication (REQUIRED - must start with 'sk-')
+litellm_master_key: ""
+
+# UI credentials (REQUIRED when using the /ui dashboard)
+litellm_ui_username: "admin"
+litellm_ui_password: ""
+
+# Fallback to external API (optional)
+litellm_fallback_enabled: false
+litellm_fallback_model_name: "gpt-4-fallback"
+litellm_fallback_provider: "openai"
+litellm_fallback_api_key: ""
+litellm_fallback_api_base: ""
+
+litellm_additional_models: []
+litellm_request_timeout: 600
+litellm_drop_params: true
+litellm_set_verbose: false
+
+# =============================================================================
+# Nginx Settings
+# =============================================================================
+nginx_enabled: true
+nginx_worker_processes: 4
+nginx_worker_connections: 1024
+nginx_rate_limit_enabled: true
+nginx_rate_limit_requests: "10r/s"
+nginx_rate_limit_burst: 20
+nginx_client_max_body_size: "10m"
+nginx_allowed_ips: []
+nginx_denied_redirect_url: ""
+nginx_proxy_connect_timeout: 60
+nginx_proxy_send_timeout: 600
+nginx_proxy_read_timeout: 600
+
+# =============================================================================
+# Security Settings
+# =============================================================================
+litellm_configure_firewall: true
+
+# =============================================================================
+# PostgreSQL Settings
+# =============================================================================
+litellm_db_enabled: false
+litellm_db_name: "litellm"
+litellm_db_user: "litellm"
+litellm_db_password: ""
+litellm_pg_data_dir: ""
+
+# =============================================================================
+# Directories
+# =============================================================================
+litellm_config_dir: "{{ litellm_install_dir }}"
