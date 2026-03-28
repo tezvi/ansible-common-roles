@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+# Fail2ban filter for LiteLLM proxy
+# Covers two log files:
+#   /var/log/litellm/litellm.log       - uvicorn access log (single-line, reliable)
+#   /var/log/litellm/litellm-error.log - application error log (multiline, IP not always present)
+#
+# Primary matching is done on access log which is always single-line:
+#   INFO:     <IP>:0 - "METHOD /path HTTP/1.1" STATUS Description
+
+[Definition]
+
+failregex = ^INFO:\s+<HOST>:0 - ".*" 401 Unauthorized$
+            ^INFO:\s+<HOST>:0 - ".*" 403 Forbidden$
+            ^INFO:\s+<HOST>:0 - "GET /jenkins/.* HTTP/\S+" 404 Not Found$
+            ^INFO:\s+<HOST>:0 - "GET /wp-.* HTTP/\S+" 404 Not Found$
+            ^INFO:\s+<HOST>:0 - "GET /\.env.* HTTP/\S+" 404 Not Found$
+            ^INFO:\s+<HOST>:0 - "GET /\.git.* HTTP/\S+" 404 Not Found$
+
+ignoreregex = ^INFO:\s+127\.0\.0\.1:.*$

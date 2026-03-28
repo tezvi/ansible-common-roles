@@ -58,3 +58,13 @@ enabled = true
 
 [sendmail-reject]
 enabled = true
+
+[litellm]
+enabled = true
+filter = litellm
+logpath = /var/log/litellm/litellm.log
+port = 4000
+maxretry = 10
+findtime = 60
+bantime = 3600
+

@@ -14,6 +14,7 @@
   with_items:
     - sshd_ddos
     - postfix-rbl
+    - litellm
 
 - name: Configure default Jail
   template:
